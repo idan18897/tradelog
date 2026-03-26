@@ -113,10 +113,12 @@ export default function Login() {
       >
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: '28px' }}>
-          <div style={{ marginBottom: '6px' }}>
+          <div style={{ marginBottom: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+            <div style={{ width: '36px', height: '36px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0 }}>
+              <img src="/logo-light.png" alt="logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            </div>
             <span style={{ fontSize: '30px', fontWeight: 400, color: 'var(--logo-color)', letterSpacing: '0.07em' }}>Trading</span>
             <span style={{ fontSize: '30px', fontWeight: 700, color: 'var(--logo-color)', letterSpacing: '0.07em' }}>Log</span>
-            <img src="/logo-light.png" alt="logo" style={{ width: '30px', height: '30px', marginInlineStart: '8px', flexShrink: 0, borderRadius: '50%', objectFit: 'cover' }} />
           </div>
           <p style={{ fontSize: '14px', color: 'var(--text-muted)' }}>{t.loginSubtitle}</p>
         </div>
