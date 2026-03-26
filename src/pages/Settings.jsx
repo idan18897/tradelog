@@ -1,0 +1,751 @@
+import { useState, useEffect } from 'react'
+import {
+  DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors,
+} from '@dnd-kit/core'
+import {
+  arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { supabase } from '../lib/supabase'
+import { useAuth } from '../context/AuthContext'
+import { useLang } from '../context/LanguageContext'
+import { useUserSettings } from '../context/UserSettingsContext'
+
+const DEFAULT_PAIRS = ['XAUUSD', 'EURUSD', 'GBPUSD', 'USDJPY', 'GBPJPY', 'USDCHF', 'AUDUSD', 'NAS100', 'US30', 'USOIL']
+
+function DragHandle() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ color: 'var(--text-subtle)' }}>
+      <circle cx="9" cy="5" r="1.5" /><circle cx="9" cy="12" r="1.5" /><circle cx="9" cy="19" r="1.5" />
+      <circle cx="15" cy="5" r="1.5" /><circle cx="15" cy="12" r="1.5" /><circle cx="15" cy="19" r="1.5" />
+    </svg>
+  )
+}
+
+function TrashIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+      <path d="M10 11v6M14 11v6" />
+      <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+    </svg>
+  )
+}
+
+function SortableSection({ id, children }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
+  return (
+    <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1, zIndex: isDragging ? 100 : 'auto', position: 'relative' }}>
+      <button
+        {...listeners} {...attributes}
+        style={{
+          position: 'absolute', top: '14px', right: '14px', zIndex: 2,
+          background: 'none', border: 'none', cursor: 'grab', padding: '4px',
+          color: 'var(--text-subtle)', touchAction: 'none', display: 'flex', borderRadius: '6px',
+        }}
+        onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'var(--bg-secondary)' }}
+        onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-subtle)'; e.currentTarget.style.background = 'none' }}
+        title="Drag to reorder"
+      >
+        <DragHandle />
+      </button>
+      {children}
+    </div>
+  )
+}
+
+function SortableItem({ item, onDelete }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id })
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1, zIndex: isDragging ? 100 : 'auto' }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        ...style,
+        display: 'flex', alignItems: 'center', gap: '10px',
+        padding: '10px 12px', borderRadius: '8px',
+        background: isDragging ? 'var(--card-hover)' : 'transparent',
+        transition: 'background 0.15s',
+      }}
+      {...attributes}
+      onMouseEnter={e => { if (!isDragging) e.currentTarget.style.background = 'var(--card-hover)' }}
+      onMouseLeave={e => { if (!isDragging) e.currentTarget.style.background = 'transparent' }}
+    >
+      <button {...listeners} style={{ background: 'none', border: 'none', cursor: 'grab', padding: '2px', color: 'var(--text-subtle)', touchAction: 'none' }}>
+        <DragHandle />
+      </button>
+      <span style={{ flex: 1, fontSize: '14px', color: 'var(--text)' }}>{item.label}</span>
+      <button
+        onClick={() => onDelete(item)}
+        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--text-subtle)', borderRadius: '6px', display: 'flex' }}
+        onMouseEnter={e => { e.currentTarget.style.color = '#f87171'; e.currentTarget.style.background = 'rgba(248,113,113,0.1)' }}
+        onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-subtle)'; e.currentTarget.style.background = 'transparent' }}
+      >
+        <TrashIcon />
+      </button>
+    </div>
+  )
+}
+
+export default function Settings() {
+  const { user } = useAuth()
+  const { t } = useLang()
+  const { updateColors } = useUserSettings()
+
+  // Confirmations state
+  const [confirmations, setConfirmations] = useState([])
+  const [newLabel, setNewLabel] = useState('')
+  const [addError, setAddError] = useState('')
+
+  // Pairs state
+  const [pairs, setPairs] = useState([])
+  const [newPair, setNewPair] = useState('')
+  const [pairError, setPairError] = useState('')
+
+  // Default risk
+  const [defaultRisk, setDefaultRisk] = useState('0.5')
+
+  // Direction colors
+  const [longColor, setLongColor] = useState('#4ade80')
+  const [shortColor, setShortColor] = useState('#f87171')
+
+  // Exit modes
+  const [exitModes, setExitModes] = useState([
+    { name: 'Standard', be_at: 3, levels: [{ pct: 50, rr: 3 }] }
+  ])
+  const [isDirty, setIsDirty] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [toast, setToast] = useState('')
+  const [visible, setVisible] = useState(false)
+  const [activeTab, setActiveTab] = useState('trading')
+  const [sectionOrder, setSectionOrder] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('settings_section_order')) || ['confirmations', 'pairs', 'risk', 'exitModes'] }
+    catch { return ['confirmations', 'pairs', 'risk', 'exitModes'] }
+  })
+
+  function handleSectionDragEnd(event) {
+    const { active, over } = event
+    if (active && over && active.id !== over.id) {
+      setSectionOrder(prev => {
+        const next = arrayMove(prev, prev.indexOf(active.id), prev.indexOf(over.id))
+        localStorage.setItem('settings_section_order', JSON.stringify(next))
+        return next
+      })
+    }
+  }
+
+  // Change password
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [pwError, setPwError] = useState('')
+  const [pwLoading, setPwLoading] = useState(false)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  )
+
+  useEffect(() => {
+    Promise.all([fetchConfirmations(), fetchSettings()]).finally(() => {
+      setLoading(false)
+    })
+  }, [])
+
+  useEffect(() => {
+    if (!loading) setTimeout(() => setVisible(true), 10)
+  }, [loading])
+
+  function showToast(msg) {
+    setToast(msg)
+    setTimeout(() => setToast(''), 2000)
+  }
+
+  // ── Confirmations ──────────────────────────────────────────
+  async function fetchConfirmations() {
+    const { data } = await supabase
+      .from('confirmations_library').select('*').eq('user_id', user.id).order('sort_order')
+    setConfirmations(data || [])
+  }
+
+  async function handleDragEnd(event) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const oldIndex = confirmations.findIndex(c => c.id === active.id)
+    const newIndex = confirmations.findIndex(c => c.id === over.id)
+    const newOrder = arrayMove(confirmations, oldIndex, newIndex)
+    setConfirmations(newOrder)
+    setSaving(true)
+    try {
+      await Promise.all(newOrder.map((item, idx) =>
+        supabase.from('confirmations_library').update({ sort_order: idx + 1 }).eq('id', item.id)
+      ))
+      showToast(t.saved)
+    } finally { setSaving(false) }
+  }
+
+  async function handleChangePassword() {
+    setPwError('')
+    if (!currentPassword) { setPwError('Please enter your current password'); return }
+    if (!newPassword || newPassword.length < 6) { setPwError('New password must be at least 6 characters'); return }
+    if (newPassword !== confirmPassword) { setPwError('New passwords do not match'); return }
+    if (newPassword === currentPassword) { setPwError('New password must be different from current password'); return }
+    setPwLoading(true)
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email: user.email, password: currentPassword })
+    if (signInError) { setPwLoading(false); setPwError('Current password is incorrect'); return }
+    const { error } = await supabase.auth.updateUser({ password: newPassword })
+    setPwLoading(false)
+    if (error) { setPwError(error.message); return }
+    setCurrentPassword('')
+    setNewPassword('')
+    setConfirmPassword('')
+    showToast('✓ Password updated successfully')
+  }
+
+  async function handleAddConfirmation() {
+    const label = newLabel.trim()
+    if (!label) return
+    setAddError('')
+    if (confirmations.find(c => c.label.toLowerCase() === label.toLowerCase())) {
+      setAddError(t.duplicateConfirmation); return
+    }
+    const maxOrder = confirmations.length > 0 ? Math.max(...confirmations.map(c => c.sort_order || 0)) : 0
+    const { data, error } = await supabase
+      .from('confirmations_library')
+      .insert({ user_id: user.id, label, sort_order: maxOrder + 1 })
+      .select().single()
+    if (error) { setAddError(error.message); return }
+    if (data) { setConfirmations(prev => [...prev, data]); setNewLabel(''); showToast(t.saved) }
+  }
+
+  async function handleDeleteConfirmation(item) {
+    if (!window.confirm(`${t.deleteConfirm} "${item.label}"?`)) return
+    const { error } = await supabase.from('confirmations_library').delete().eq('id', item.id)
+    if (!error) setConfirmations(prev => prev.filter(c => c.id !== item.id))
+  }
+
+  // ── User Settings (Pairs + Risk) ───────────────────────────
+  async function fetchSettings() {
+    const { data, error } = await supabase
+      .from('user_settings').select('*').eq('user_id', user.id).maybeSingle()
+    if (error) {
+      console.error('user_settings fetch error:', error.message)
+    }
+    if (data) {
+      setPairs(data.pairs?.length ? data.pairs : DEFAULT_PAIRS)
+      setDefaultRisk(data.default_risk_pct?.toString() || '0.5')
+      if (data.long_color) setLongColor(data.long_color)
+      if (data.short_color) setShortColor(data.short_color)
+      if (data.exit_modes?.length) setExitModes(data.exit_modes)
+    } else {
+      setPairs(DEFAULT_PAIRS)
+    }
+  }
+
+  function handleAddPair() {
+    const symbol = newPair.trim().toUpperCase()
+    if (!symbol) return
+    setPairError('')
+    if (pairs.find(p => p.toUpperCase() === symbol)) {
+      setPairError(t.duplicateConfirmation); return
+    }
+    setPairs(prev => [...prev, symbol])
+    setNewPair('')
+    setIsDirty(true)
+  }
+
+  function handleDeletePair(symbol) {
+    if (!window.confirm(`${t.deleteConfirm} "${symbol}"?`)) return
+    setPairs(prev => prev.filter(p => p !== symbol))
+    setIsDirty(true)
+  }
+
+  async function handleSaveAll() {
+    setSaving(true)
+    const { error } = await supabase.from('user_settings').upsert({
+      user_id: user.id,
+      pairs,
+      default_risk_pct: parseFloat(defaultRisk) || 0.5,
+      long_color: longColor,
+      short_color: shortColor,
+      exit_modes: exitModes,
+    }, { onConflict: 'user_id' })
+    setSaving(false)
+    if (error) {
+      setToast('❌ ' + error.message)
+      setTimeout(() => setToast(''), 5000)
+    } else {
+      updateColors(longColor, shortColor)
+      setIsDirty(false)
+      showToast(t.saved)
+    }
+  }
+
+  // ── Styles ─────────────────────────────────────────────────
+  const cardStyle = {
+    background: 'var(--card)', border: '1px solid var(--border)',
+    borderRadius: '18px', padding: '22px', boxShadow: 'var(--shadow)',
+    marginBottom: '16px',
+  }
+  const inputStyle = {
+    background: 'var(--input-bg)', border: '1px solid var(--input-border)',
+    color: 'var(--text)', borderRadius: '10px', padding: '9px 13px',
+    fontSize: '14px', outline: 'none', flex: 1, letterSpacing: '-0.01em',
+  }
+  const btnPrimary = {
+    background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-color)', border: 'none',
+    borderRadius: '10px', padding: '9px 18px', fontSize: '14px',
+    fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
+    letterSpacing: '-0.01em',
+  }
+  const sectionTitle = { fontSize: '15px', fontWeight: 700, color: 'var(--text)', marginBottom: '4px', letterSpacing: '-0.02em' }
+  const sectionSub = { fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px' }
+
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', padding: '60px' }}>
+      <div className="spinner" />
+    </div>
+  )
+
+  return (
+    <div className={visible ? 'fade-in' : ''} style={{ padding: '28px 32px', maxWidth: '800px', margin: '0 auto', opacity: visible ? 1 : 0, transition: 'opacity 0.25s' }}>
+
+      {/* Toast */}
+      {toast && (
+        <div className="fade-in" style={{
+          position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)',
+          background: toast.startsWith('❌') ? '#ef4444' : 'var(--btn-primary-bg)',
+          color: 'var(--btn-primary-color)', padding: '10px 20px',
+          borderRadius: '10px', fontSize: '14px', fontWeight: 600, zIndex: 999,
+        }}>
+          {toast}
+        </div>
+      )}
+
+      <h1 style={{ fontSize: '22px', fontWeight: 800, color: 'var(--text)', marginBottom: '20px' }}>
+        {t.settingsTitle}
+      </h1>
+
+      {/* ── Tabs ── */}
+      <div style={{
+        display: 'inline-flex', alignItems: 'center', gap: '2px',
+        background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+        borderRadius: '30px', padding: '4px', marginBottom: '24px',
+        boxShadow: 'var(--shadow)',
+      }}>
+        {[
+          { key: 'trading', label: 'Trading' },
+          { key: 'general', label: 'General' },
+          { key: 'account', label: 'Account' },
+        ].map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            style={{
+              padding: '6px 18px', borderRadius: '20px', fontSize: '13px', border: 'none', cursor: 'pointer',
+              fontWeight: activeTab === tab.key ? 600 : 400,
+              color: activeTab === tab.key ? 'var(--text)' : 'var(--text-muted)',
+              background: activeTab === tab.key ? 'var(--card)' : 'transparent',
+              boxShadow: activeTab === tab.key ? 'var(--shadow)' : 'none',
+              transition: 'all 0.15s',
+            }}
+          >{tab.label}</button>
+        ))}
+      </div>
+
+      {activeTab === 'trading' && (
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleSectionDragEnd}>
+        <SortableContext items={sectionOrder} strategy={verticalListSortingStrategy}>
+          {sectionOrder.map(key => {
+            if (key === 'confirmations') return (
+              <SortableSection key="confirmations" id="confirmations">
+                <div style={cardStyle}>
+                  <p style={sectionTitle}>{t.confirmationsLibrary}</p>
+                  <p style={sectionSub}>Drag to reorder, click to delete</p>
+                  {confirmations.length === 0 ? (
+                    <p style={{ fontSize: '13px', color: 'var(--text-muted)', textAlign: 'center', padding: '20px 0' }}>{t.noConfirmations}</p>
+                  ) : (
+                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                      <SortableContext items={confirmations.map(c => c.id)} strategy={verticalListSortingStrategy}>
+                        <div style={{ border: '1px solid var(--border)', borderRadius: '10px', overflow: 'hidden', marginBottom: '14px' }}>
+                          {confirmations.map(item => <SortableItem key={item.id} item={item} onDelete={handleDeleteConfirmation} />)}
+                        </div>
+                      </SortableContext>
+                    </DndContext>
+                  )}
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input type="text" value={newLabel} onChange={e => { setNewLabel(e.target.value); setAddError('') }} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddConfirmation())} placeholder={t.newConfirmationPlaceholder} style={inputStyle} />
+                    <button onClick={handleAddConfirmation} style={btnPrimary}>{t.addBtn}</button>
+                  </div>
+                  {addError && <p style={{ fontSize: '12px', color: '#f87171', marginTop: '6px' }}>{addError}</p>}
+                </div>
+              </SortableSection>
+            )
+            if (key === 'pairs') return (
+              <SortableSection key="pairs" id="pairs">
+                <div style={cardStyle}>
+                  <p style={sectionTitle}>{t.pairsLibrary || 'Pairs Library'}</p>
+                  <p style={sectionSub}>Pairs that appear in the new trade form</p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '14px' }}>
+                    {pairs.map(symbol => (
+                      <div key={symbol} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '8px', padding: '5px 10px 5px 8px' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', fontFamily: 'monospace' }}>{symbol}</span>
+                        <button onClick={() => handleDeletePair(symbol)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '1px', color: 'var(--text-subtle)', display: 'flex', lineHeight: 1 }} onMouseEnter={e => e.currentTarget.style.color = '#f87171'} onMouseLeave={e => e.currentTarget.style.color = 'var(--text-subtle)'}>
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input type="text" value={newPair} onChange={e => { setNewPair(e.target.value.toUpperCase()); setPairError('') }} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddPair())} placeholder={t.newPairPlaceholder || 'e.g. BTCUSD'} style={{ ...inputStyle, fontFamily: 'monospace', textTransform: 'uppercase' }} />
+                    <button onClick={handleAddPair} style={btnPrimary}>{t.addBtn}</button>
+                  </div>
+                  {pairError && <p style={{ fontSize: '12px', color: '#f87171', marginTop: '6px' }}>{pairError}</p>}
+                </div>
+              </SortableSection>
+            )
+            if (key === 'risk') return (
+              <SortableSection key="risk" id="risk">
+                <div style={cardStyle}>
+                  <p style={sectionTitle}>Default Risk %</p>
+                  <p style={sectionSub}>Auto-loaded in every new trade</p>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <input type="number" step="0.1" min="0.1" max="100" value={defaultRisk} onChange={e => { setDefaultRisk(e.target.value); setIsDirty(true) }} style={{ ...inputStyle, maxWidth: '120px' }} />
+                    <span style={{ color: 'var(--text-muted)', fontSize: '14px' }}>%</span>
+                  </div>
+                </div>
+              </SortableSection>
+            )
+
+            if (key === 'exitModes') return (
+              <SortableSection key="exitModes" id="exitModes">
+              <div style={cardStyle}>
+                <p style={sectionTitle}>Exit Modes</p>
+                <p style={sectionSub}>Define partial exit presets for your trades (up to 4 levels each)</p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {exitModes.map((mode, mi) => (
+            <div key={mi} style={{
+              border: '1px solid var(--border)', borderRadius: '10px', padding: '14px',
+              background: 'var(--bg)',
+            }}>
+              {/* Mode header */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                <input
+                  type="text"
+                  value={mode.name}
+                  onChange={e => {
+                    const updated = [...exitModes]
+                    updated[mi] = { ...updated[mi], name: e.target.value }
+                    setExitModes(updated); setIsDirty(true)
+                  }}
+                  style={{ ...inputStyle, flex: 1, fontWeight: 600 }}
+                  placeholder="Mode name"
+                />
+                {exitModes.length > 1 && (
+                  <button
+                    onClick={() => { setExitModes(prev => prev.filter((_, i) => i !== mi)); setIsDirty(true) }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-subtle)', display: 'flex', padding: '4px' }}
+                    onMouseEnter={e => { e.currentTarget.style.color = '#f87171' }}
+                    onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-subtle)' }}
+                  >
+                    <TrashIcon />
+                  </button>
+                )}
+              </div>
+
+              {/* BE at */}
+              <div style={{ marginBottom: '10px' }}>
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px' }}>Move SL to BE at</p>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  {[1, 2, 3, 4].map(rr => {
+                    const isActive = mode.be_at === rr
+                    return (
+                      <button
+                        key={rr}
+                        onClick={() => {
+                          const updated = [...exitModes]
+                          updated[mi] = { ...updated[mi], be_at: rr }
+                          setExitModes(updated); setIsDirty(true)
+                        }}
+                        style={{
+                          padding: '4px 12px', borderRadius: '7px', fontSize: '12px',
+                          fontWeight: isActive ? 700 : 400, cursor: 'pointer',
+                          background: isActive ? 'rgba(250,204,21,0.15)' : 'var(--card)',
+                          border: `1px solid ${isActive ? '#facc15' : 'var(--border)'}`,
+                          color: isActive ? '#facc15' : 'var(--text-muted)',
+                        }}
+                      >1:{rr}</button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Levels */}
+              <div>
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px' }}>Exit Levels</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {mode.levels.map((level, li) => (
+                    <div key={li} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', minWidth: '48px' }}>Level {li + 1}</span>
+                      <input
+                        type="number" min="1" max="100" step="1"
+                        value={level.pct}
+                        onChange={e => {
+                          const updated = [...exitModes]
+                          updated[mi].levels[li] = { ...level, pct: parseInt(e.target.value) || 0 }
+                          setExitModes([...updated]); setIsDirty(true)
+                        }}
+                        style={{ ...inputStyle, width: '68px', textAlign: 'center', padding: '6px 8px' }}
+                        placeholder="%"
+                      />
+                      <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>% at R:R</span>
+                      <input
+                        type="number" min="1" max="20" step="0.5"
+                        value={level.rr}
+                        onChange={e => {
+                          const updated = [...exitModes]
+                          updated[mi].levels[li] = { ...level, rr: parseFloat(e.target.value) || 0 }
+                          setExitModes([...updated]); setIsDirty(true)
+                        }}
+                        style={{ ...inputStyle, width: '68px', textAlign: 'center', padding: '6px 8px' }}
+                        placeholder="3"
+                      />
+                      {mode.levels.length > 1 && (
+                        <button
+                          onClick={() => {
+                            const updated = [...exitModes]
+                            updated[mi].levels = mode.levels.filter((_, j) => j !== li)
+                            setExitModes([...updated]); setIsDirty(true)
+                          }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-subtle)', fontSize: '15px', padding: '2px' }}
+                          onMouseEnter={e => { e.currentTarget.style.color = '#f87171' }}
+                          onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-subtle)' }}
+                        >✕</button>
+                      )}
+                    </div>
+                  ))}
+                  {mode.levels.length < 4 && (
+                    <button
+                      onClick={() => {
+                        const updated = [...exitModes]
+                        updated[mi].levels = [...mode.levels, { pct: 50, rr: mode.be_at || 3 }]
+                        setExitModes([...updated]); setIsDirty(true)
+                      }}
+                      style={{
+                        padding: '5px 10px', borderRadius: '7px', fontSize: '12px',
+                        cursor: 'pointer', border: '1px dashed var(--border)',
+                        background: 'transparent', color: 'var(--text-muted)', alignSelf: 'flex-start',
+                      }}
+                    >+ Add Level</button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {/* Add mode button */}
+          {exitModes.length < 6 && (
+            <button
+              onClick={() => {
+                setExitModes(prev => [...prev, { name: `Mode ${prev.length + 1}`, be_at: 3, levels: [{ pct: 50, rr: 3 }] }])
+                setIsDirty(true)
+              }}
+              style={{
+                padding: '9px', borderRadius: '9px', fontSize: '13px', fontWeight: 600,
+                cursor: 'pointer', border: '1px dashed var(--border)',
+                background: 'transparent', color: 'var(--text-muted)',
+              }}
+            >+ Add Mode</button>
+          )}
+        </div>
+              </div>
+              </SortableSection>
+            )
+            return null
+          })}
+        </SortableContext>
+      </DndContext>
+      )}
+
+      {activeTab === 'general' && (<>
+
+      {/* ── Direction Colors ── */}
+      <div style={cardStyle}>
+        <p style={sectionTitle}>Direction Colors</p>
+        <p style={sectionSub}>Customize the color used for Long and Short labels throughout the app</p>
+        <div style={{ display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* Long */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <label style={{ position: 'relative', cursor: 'pointer' }}>
+              <div style={{
+                width: '38px', height: '38px', borderRadius: '10px',
+                background: longColor,
+                border: '2px solid var(--border)',
+                cursor: 'pointer',
+                transition: 'transform 0.1s',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+              }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.1)' }}
+                onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}
+              />
+              <input
+                type="color"
+                value={longColor}
+                onChange={e => { setLongColor(e.target.value); setIsDirty(true) }}
+                style={{ position: 'absolute', opacity: 0, width: '1px', height: '1px', pointerEvents: 'none' }}
+              />
+            </label>
+            <div>
+              <p style={{ fontSize: '13px', fontWeight: 600, color: longColor }}>Long</p>
+              <p style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{longColor.toUpperCase()}</p>
+            </div>
+          </div>
+
+          <div style={{ width: '1px', height: '40px', background: 'var(--border)' }} />
+
+          {/* Short */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <label style={{ position: 'relative', cursor: 'pointer' }}>
+              <div style={{
+                width: '38px', height: '38px', borderRadius: '10px',
+                background: shortColor,
+                border: '2px solid var(--border)',
+                cursor: 'pointer',
+                transition: 'transform 0.1s',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+              }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.1)' }}
+                onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}
+              />
+              <input
+                type="color"
+                value={shortColor}
+                onChange={e => { setShortColor(e.target.value); setIsDirty(true) }}
+                style={{ position: 'absolute', opacity: 0, width: '1px', height: '1px', pointerEvents: 'none' }}
+              />
+            </label>
+            <div>
+              <p style={{ fontSize: '13px', fontWeight: 600, color: shortColor }}>Short</p>
+              <p style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{shortColor.toUpperCase()}</p>
+            </div>
+          </div>
+
+          {/* Reset to defaults */}
+          <button
+            onClick={() => { setLongColor('#4ade80'); setShortColor('#f87171'); setIsDirty(true) }}
+            style={{
+              marginLeft: 'auto', background: 'none', border: '1px solid var(--border)',
+              color: 'var(--text-muted)', borderRadius: '8px', padding: '6px 12px',
+              fontSize: '12px', cursor: 'pointer',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--accent)' }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-muted)' }}
+          >
+            Reset defaults
+          </button>
+        </div>
+        <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '10px' }}>
+          Click the color swatch to open the color picker
+        </p>
+      </div>
+
+      </>)}
+
+      {/* ── Save All button — shown on Trading + General tabs ── */}
+      {activeTab !== 'account' && <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px', marginTop: '8px' }}>
+        <button
+          onClick={handleSaveAll}
+          disabled={saving}
+          style={{
+            ...btnPrimary,
+            padding: '11px 28px',
+            fontSize: '15px',
+            borderRadius: '10px',
+            opacity: saving ? 0.7 : 1,
+            display: 'flex', alignItems: 'center', gap: '8px',
+          }}
+        >
+          {saving ? (
+            <>
+              <span className="spinner" style={{ width: '16px', height: '16px', borderWidth: '2px' }} />
+              Saving...
+            </>
+          ) : (
+            <>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                <polyline points="17 21 17 13 7 13 7 21" />
+                <polyline points="7 3 7 8 15 8" />
+              </svg>
+              {t.save || 'שמור הגדרות'}
+            </>
+          )}
+        </button>
+        {isDirty && (
+          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+            • Unsaved changes
+          </span>
+        )}
+      </div>}
+
+      {activeTab === 'account' && (<>
+
+      {/* ── Account ── */}
+      <div style={cardStyle}>
+        <p style={sectionTitle}>{t.account}</p>
+        <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>{t.email}</p>
+        <p style={{ fontSize: '14px', color: 'var(--text)', marginBottom: '24px' }}>{user?.email}</p>
+
+        <p style={{ ...sectionTitle, fontSize: '13px', marginBottom: '14px' }}>Change Password</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '340px' }}>
+          <input
+            type="password"
+            placeholder="Current password"
+            value={currentPassword}
+            onChange={e => { setCurrentPassword(e.target.value); setPwError('') }}
+            style={inputStyle}
+          />
+          <div style={{ height: '1px', background: 'var(--border)', margin: '2px 0' }} />
+          <input
+            type="password"
+            placeholder="New password"
+            value={newPassword}
+            onChange={e => { setNewPassword(e.target.value); setPwError('') }}
+            style={inputStyle}
+          />
+          <input
+            type="password"
+            placeholder="Confirm new password"
+            value={confirmPassword}
+            onChange={e => { setConfirmPassword(e.target.value); setPwError('') }}
+            style={{
+              ...inputStyle,
+              borderColor: confirmPassword && newPassword !== confirmPassword ? '#f87171' : undefined,
+            }}
+          />
+          {pwError && (
+            <p style={{ fontSize: '12px', color: '#f87171', margin: 0 }}>{pwError}</p>
+          )}
+          <button
+            onClick={handleChangePassword}
+            disabled={pwLoading || !currentPassword || !newPassword || !confirmPassword}
+            style={{
+              ...btnPrimary,
+              alignSelf: 'flex-start',
+              opacity: pwLoading || !currentPassword || !newPassword || !confirmPassword ? 0.5 : 1,
+            }}
+          >
+            {pwLoading ? 'Updating...' : 'Update Password'}
+          </button>
+        </div>
+      </div>
+
+      </>)}
+
+    </div>
+  )
+}
