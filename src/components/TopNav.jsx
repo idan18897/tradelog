@@ -87,54 +87,62 @@ export default function TopNav() {
   }, [userMenuOpen])
 
   return (
+    <>
+    <style>{`
+      @media (max-width: 600px) {
+        .topnav-desktop-nav { display: none !important; }
+        .topnav-bottom { display: flex !important; }
+      }
+      @media (min-width: 601px) {
+        .topnav-bottom { display: none !important; }
+      }
+    `}</style>
     <header style={{
       background: 'var(--bg)',
-      height: '60px',
-      display: 'flex',
-      alignItems: 'center',
-      paddingLeft: '20px',
-      paddingRight: '20px',
       flexShrink: 0,
       position: 'sticky',
       top: 0,
       zIndex: 40,
+      borderBottom: '1px solid var(--border)',
     }}>
-      {/* Logo — left */}
-      <div
-        style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', flexShrink: 0, minWidth: '140px' }}
-        onClick={() => navigate('/')}
-      >
-        <div style={{ width: '54px', height: '54px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0, alignSelf: 'flex-start', marginTop: '6px' }}>
-          <img src="/logo-light.png" alt="logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      {/* Top row */}
+      <div style={{ height: '60px', display: 'flex', alignItems: 'center', paddingLeft: '16px', paddingRight: '16px' }}>
+        {/* Logo — left */}
+        <div
+          style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', flexShrink: 0 }}
+          onClick={() => navigate('/')}
+        >
+          <div style={{ width: '40px', height: '40px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0 }}>
+            <img src="/logo-light.png" alt="logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          </div>
         </div>
-      </div>
 
-      {/* Nav pill — absolute center */}
-      <nav style={{
-        position: 'absolute',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '2px',
-        background: 'var(--bg-secondary)',
-        border: '1px solid var(--border)',
-        borderRadius: '30px',
-        padding: '4px',
-        boxShadow: 'var(--shadow)',
-      }}>
-        {navItems.map(({ to, label, end }) => (
-          <NavLink key={to} to={to} end={end} style={navLinkStyle}
-            onMouseEnter={e => { if (!e.currentTarget.style.boxShadow || e.currentTarget.style.boxShadow === 'none') e.currentTarget.style.color = 'var(--text)' }}
-            onMouseLeave={e => { if (!e.currentTarget.style.boxShadow || e.currentTarget.style.boxShadow === 'none') e.currentTarget.style.color = 'var(--text-muted)' }}
-          >
-            {label}
-          </NavLink>
-        ))}
-      </nav>
+        {/* Nav pill — absolute center (desktop only) */}
+        <nav className="topnav-desktop-nav" style={{
+          position: 'absolute',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '2px',
+          background: 'var(--bg-secondary)',
+          border: '1px solid var(--border)',
+          borderRadius: '30px',
+          padding: '4px',
+          boxShadow: 'var(--shadow)',
+        }}>
+          {navItems.map(({ to, label, end }) => (
+            <NavLink key={to} to={to} end={end} style={navLinkStyle}
+              onMouseEnter={e => { if (!e.currentTarget.style.boxShadow || e.currentTarget.style.boxShadow === 'none') e.currentTarget.style.color = 'var(--text)' }}
+              onMouseLeave={e => { if (!e.currentTarget.style.boxShadow || e.currentTarget.style.boxShadow === 'none') e.currentTarget.style.color = 'var(--text-muted)' }}
+            >
+              {label}
+            </NavLink>
+          ))}
+        </nav>
 
-      {/* Right controls */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0, marginInlineStart: 'auto' }}>
+        {/* Right controls */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0, marginInlineStart: 'auto' }}>
         {/* Theme toggle */}
         <button
           onClick={toggleTheme} style={iconBtn}
@@ -235,6 +243,32 @@ export default function TopNav() {
           )}
         </div>
       </div>
+
+      {/* Mobile bottom nav */}
+      <div className="topnav-bottom" style={{
+        display: 'none',
+        borderTop: '1px solid var(--border)',
+        padding: '0 4px 4px',
+      }}>
+        {navItems.map(({ to, label, end }) => (
+          <NavLink key={to} to={to} end={end} style={({ isActive }) => ({
+            flex: 1,
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: '10px 4px',
+            fontSize: '13px',
+            fontWeight: isActive ? 600 : 400,
+            color: isActive ? 'var(--text)' : 'var(--text-muted)',
+            textDecoration: 'none',
+            borderRadius: '10px',
+            background: isActive ? 'var(--card)' : 'transparent',
+          })}>
+            {label}
+          </NavLink>
+        ))}
+      </div>
     </header>
+    </>
   )
 }

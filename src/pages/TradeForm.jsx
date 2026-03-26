@@ -621,7 +621,7 @@ export default function TradeForm() {
 
   return (
     <div
-      className={`transition-all duration-300 ${visible ? 'fade-in' : 'opacity-0'}`}
+      className={`page-wrap transition-all duration-300 ${visible ? 'fade-in' : 'opacity-0'}`}
       style={{ padding: '28px 32px', maxWidth: '1100px', margin: '0 auto' }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '22px' }}>

@@ -205,3 +205,47 @@ select option {
   border-radius: 50%;
   animation: spin 0.65s linear infinite;
 }
+
+/* ─────────────────────────────────────────
+   MOBILE RESPONSIVE
+───────────────────────────────────────── */
+@media (max-width: 600px) {
+  /* Page padding */
+  .page-wrap {
+    padding: 14px 12px !important;
+  }
+
+  /* All inline grids → single column */
+  div[style*="gridTemplateColumns"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Stat cards keep 2 columns */
+  div[style*="repeat(2, 1fr)"] {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  /* Tables — horizontal scroll */
+  table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+  }
+
+  /* Recharts height */
+  .recharts-wrapper {
+    min-height: 180px;
+  }
+
+  /* Smaller headings */
+  h1 { font-size: 18px !important; }
+
+  /* Card padding reduce */
+  div[style*="padding: 20px"] {
+    padding: 14px !important;
+  }
+  div[style*="padding: 18px"] {
+    padding: 12px !important;
+  }
+}

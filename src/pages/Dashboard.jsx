@@ -367,7 +367,7 @@ export default function Dashboard() {
 
   return (
     <div
-      className={`transition-all duration-300 ${visible ? 'fade-in' : 'opacity-0'}`}
+      className={`page-wrap transition-all duration-300 ${visible ? 'fade-in' : 'opacity-0'}`}
       style={{ padding: '28px 32px', maxWidth: '1400px', margin: '0 auto' }}
     >
       {/* ── Time Filter Bar ── */}
