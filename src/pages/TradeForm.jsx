@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { useLang } from '../context/LanguageContext'
+import { useIsMobile } from '../hooks/useIsMobile'
 import DatePicker from '../components/DatePicker'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
@@ -299,6 +300,7 @@ export default function TradeForm() {
   const isEditing = Boolean(id)
   const { user } = useAuth()
   const { t } = useLang()
+  const isMobile = useIsMobile()
   const navigate = useNavigate()
 
   const [formData, setFormData] = useState({
@@ -686,7 +688,7 @@ export default function TradeForm() {
                   {sectionId === 'basic' && (
                     <div style={cardStyle}>
                       <h2 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', marginBottom: '16px' }}>{t.basicDetails}</h2>
-                      <div style={{ display: 'grid', gridTemplateColumns: '3fr 160px 2fr', gap: '14px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '3fr 160px 2fr', gap: '14px' }}>
                         <div>
                           <label style={labelStyle}>{t.date}</label>
                           <DatePicker value={formData.date} onChange={val => handleField('date', val)} />
@@ -723,7 +725,7 @@ export default function TradeForm() {
                   {sectionId === 'prices' && (
                     <div style={cardStyle}>
                       <h2 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', marginBottom: '16px' }}>{t.prices}</h2>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px' }} className="md:grid-cols-3">
+                      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: '14px' }} className="md:grid-cols-3">
                         <div><label style={labelStyle}>{t.entry}</label><input type="number" step="any" value={formData.entry} onChange={e => handleField('entry', e.target.value)} style={inputStyle} placeholder="0.00000" /></div>
                         <div><label style={labelStyle}>SL</label><input type="number" step="any" value={formData.sl} onChange={e => handleField('sl', e.target.value)} style={inputStyle} placeholder="0.00000" /></div>
                         <div><label style={labelStyle}>TP</label><input type="number" step="any" value={formData.tp} onChange={e => handleField('tp', e.target.value)} style={inputStyle} placeholder="0.00000" /></div>

@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { useLang } from '../context/LanguageContext'
+import { useIsMobile } from '../hooks/useIsMobile'
 
 const SunIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -43,6 +44,7 @@ export default function TopNav() {
   const { isDark, toggle: toggleTheme } = useTheme()
   const { t } = useLang()
   const navigate = useNavigate()
+  const isMobile = useIsMobile()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const userMenuRef = useRef(null)
 
@@ -118,28 +120,30 @@ export default function TopNav() {
         </div>
 
         {/* Nav pill — absolute center (desktop only) */}
-        <nav className="topnav-desktop-nav" style={{
-          position: 'absolute',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '2px',
-          background: 'var(--bg-secondary)',
-          border: '1px solid var(--border)',
-          borderRadius: '30px',
-          padding: '4px',
-          boxShadow: 'var(--shadow)',
-        }}>
-          {navItems.map(({ to, label, end }) => (
-            <NavLink key={to} to={to} end={end} style={navLinkStyle}
-              onMouseEnter={e => { if (!e.currentTarget.style.boxShadow || e.currentTarget.style.boxShadow === 'none') e.currentTarget.style.color = 'var(--text)' }}
-              onMouseLeave={e => { if (!e.currentTarget.style.boxShadow || e.currentTarget.style.boxShadow === 'none') e.currentTarget.style.color = 'var(--text-muted)' }}
-            >
-              {label}
-            </NavLink>
-          ))}
-        </nav>
+        {!isMobile && (
+          <nav style={{
+            position: 'absolute',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '2px',
+            background: 'var(--bg-secondary)',
+            border: '1px solid var(--border)',
+            borderRadius: '30px',
+            padding: '4px',
+            boxShadow: 'var(--shadow)',
+          }}>
+            {navItems.map(({ to, label, end }) => (
+              <NavLink key={to} to={to} end={end} style={navLinkStyle}
+                onMouseEnter={e => { if (!e.currentTarget.style.boxShadow || e.currentTarget.style.boxShadow === 'none') e.currentTarget.style.color = 'var(--text)' }}
+                onMouseLeave={e => { if (!e.currentTarget.style.boxShadow || e.currentTarget.style.boxShadow === 'none') e.currentTarget.style.color = 'var(--text-muted)' }}
+              >
+                {label}
+              </NavLink>
+            ))}
+          </nav>
+        )}
 
         {/* Right controls */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0, marginInlineStart: 'auto' }}>
@@ -242,32 +246,35 @@ export default function TopNav() {
             </div>
           )}
         </div>
+        </div>
       </div>
 
       {/* Mobile bottom nav */}
-      <div className="topnav-bottom" style={{
-        display: 'none',
-        borderTop: '1px solid var(--border)',
-        padding: '0 4px 4px',
-      }}>
-        {navItems.map(({ to, label, end }) => (
-          <NavLink key={to} to={to} end={end} style={({ isActive }) => ({
-            flex: 1,
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            padding: '10px 4px',
-            fontSize: '13px',
-            fontWeight: isActive ? 600 : 400,
-            color: isActive ? 'var(--text)' : 'var(--text-muted)',
-            textDecoration: 'none',
-            borderRadius: '10px',
-            background: isActive ? 'var(--card)' : 'transparent',
-          })}>
-            {label}
-          </NavLink>
-        ))}
-      </div>
+      {isMobile && (
+        <div style={{
+          display: 'flex',
+          borderTop: '1px solid var(--border)',
+          padding: '4px',
+        }}>
+          {navItems.map(({ to, label, end }) => (
+            <NavLink key={to} to={to} end={end} style={({ isActive }) => ({
+              flex: 1,
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              padding: '8px 4px',
+              fontSize: '13px',
+              fontWeight: isActive ? 600 : 400,
+              color: isActive ? 'var(--text)' : 'var(--text-muted)',
+              textDecoration: 'none',
+              borderRadius: '10px',
+              background: isActive ? 'var(--card)' : 'transparent',
+            })}>
+              {label}
+            </NavLink>
+          ))}
+        </div>
+      )}
     </header>
     </>
   )
