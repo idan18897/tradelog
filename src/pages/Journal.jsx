@@ -258,9 +258,13 @@ const fullRR = Number(tr.rr_potential) || Number(tr.pot_rr) || 0
     tr.date?.slice(0, 7) === calMonth && tr.outcome === 'SL'
   ).length
 
-  // Group cells into weeks of 7
+  // Group cells into weeks of 7, pad last week to always have 7 day slots
   const weeks = []
-  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7))
+  for (let i = 0; i < cells.length; i += 7) {
+    const week = cells.slice(i, i + 7)
+    while (week.length < 7) week.push(null)
+    weeks.push(week)
+  }
 
   const navBtn = {
     background: 'var(--bg)', border: '1px solid var(--border)',
