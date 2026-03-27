@@ -402,7 +402,15 @@ export default function TradeForm() {
     const { data } = await supabase
       .from('user_settings').select('*').eq('user_id', user.id).maybeSingle()
     if (data) {
-      if (data.pairs?.length) setPairsList(data.pairs)
+      if (data.pairs?.length) {
+        setPairsList(data.pairs)
+        if (!isEditing) {
+          setFormData(prev => ({
+            ...prev,
+            pair: data.pairs.includes(prev.pair) ? prev.pair : data.pairs[0],
+          }))
+        }
+      }
       if (!isEditing && data.default_risk_pct) {
         setFormData(prev => ({ ...prev, risk_pct: data.default_risk_pct.toString() }))
       }
