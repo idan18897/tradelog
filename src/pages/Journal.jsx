@@ -215,6 +215,7 @@ function TradeCalendar({ trades, secondaryTrades, calMonth, onMonthChange, filte
       if (!tr.date || tr.date.slice(0, 7) !== calMonth) return
       if (!missedStats[tr.date]) missedStats[tr.date] = { count: 0, potPnL: 0 }
       missedStats[tr.date].count++
+      console.log('[missed]', tr.date, 'pot_rr=', tr.pot_rr, 'rr_potential=', tr.rr_potential, 'risk=', tr.risk_pct, 'sl_to_be=', tr.sl_to_be, 'exit_levels=', tr.exit_levels)
       const fullRR = Number(tr.pot_rr) || Number(tr.rr_potential) || 0
       const risk = Number(tr.risk_pct) || 0.5
       let potGain = 0
