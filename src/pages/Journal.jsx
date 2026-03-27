@@ -541,22 +541,28 @@ export default function Journal() {
     new Date(b.date + 'T' + (b.time || '00:00')) - new Date(a.date + 'T' + (a.time || '00:00'))
   )
 
-  // Comparison stats
+  // Comparison stats — filtered to calMonth for Combined tab
   const computePnL = t => {
     if (t.outcome === 'TP') return (t.rr_potential || 0) * (t.risk_pct || 0.5)
     if (t.outcome === 'Partial TP') return (t.rr_potential || 0) * (t.risk_pct || 0.5) * 0.5
     if (t.outcome === 'SL') return -(t.risk_pct || 0.5)
     return 0
   }
-  const liveClosed = liveTrades.filter(t => ['TP', 'Partial TP', 'SL', 'BE'].includes(t.outcome))
-  const liveWinRate = liveClosed.length ? Math.round(liveTPTrades.length / liveClosed.length * 100) : 0
-  const liveAvgRR = liveTPTrades.length ? (liveTPTrades.reduce((s, t) => s + (t.rr_potential || 0), 0) / liveTPTrades.length).toFixed(1) : '0'
-  const liveTotalPnL = liveTrades.reduce((s, t) => s + computePnL(t), 0)
+  const inCalMonth = t => t.date?.slice(0, 7) === calMonth
+  const mLiveTrades = liveTrades.filter(inCalMonth)
+  const mLiveTPTrades = mLiveTrades.filter(t => t.outcome === 'TP' || t.outcome === 'Partial TP')
+  const mMissedTrades = missedTrades.filter(inCalMonth)
+  const mBacktestTrades = [...mLiveTPTrades, ...mMissedTrades]
 
-  const btAvgRR = backtestTrades.length ? (backtestTrades.reduce((s, t) => s + (t.rr_potential || 0), 0) / backtestTrades.length).toFixed(1) : '0'
-  const btTotalPnL = backtestTrades.reduce((s, t) => s + (t.rr_potential || 0) * (t.risk_pct || 0.5), 0)
-  const captureRate = backtestTrades.length ? Math.round(liveTPTrades.length / backtestTrades.length * 100) : 0
-  const missedCount = missedTrades.length
+  const liveClosed = mLiveTrades.filter(t => ['TP', 'Partial TP', 'SL', 'BE'].includes(t.outcome))
+  const liveWinRate = liveClosed.length ? Math.round(mLiveTPTrades.length / liveClosed.length * 100) : 0
+  const liveAvgRR = mLiveTPTrades.length ? (mLiveTPTrades.reduce((s, t) => s + (t.rr_potential || 0), 0) / mLiveTPTrades.length).toFixed(1) : '0'
+  const liveTotalPnL = mLiveTrades.reduce((s, t) => s + computePnL(t), 0)
+
+  const btAvgRR = mBacktestTrades.length ? (mBacktestTrades.reduce((s, t) => s + (t.rr_potential || 0), 0) / mBacktestTrades.length).toFixed(1) : '0'
+  const btTotalPnL = mBacktestTrades.reduce((s, t) => s + (t.rr_potential || 0) * (t.risk_pct || 0.5), 0)
+  const captureRate = mBacktestTrades.length ? Math.round(mLiveTPTrades.length / mBacktestTrades.length * 100) : 0
+  const missedCount = mMissedTrades.length
 
   // Combined = all live + all missed (full picture)
   const combinedTrades = [...liveTrades, ...missedTrades].sort((a, b) =>
