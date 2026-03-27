@@ -357,14 +357,16 @@ export default function TradeForm() {
     try { const s = localStorage.getItem('tradeFormSectionOrder'); return s ? JSON.parse(s) : DEFAULT_SECTION_ORDER } catch { return DEFAULT_SECTION_ORDER }
   })
   const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor))
-  function handleSectionDragEnd(event) {
+  async function handleSectionDragEnd(event) {
     const { active, over } = event
     if (!over || active.id === over.id) return
-    setSectionOrder(prev => {
-      const next = arrayMove(prev, prev.indexOf(active.id), prev.indexOf(over.id))
-      localStorage.setItem('tradeFormSectionOrder', JSON.stringify(next))
-      return next
-    })
+    const next = arrayMove(sectionOrder, sectionOrder.indexOf(active.id), sectionOrder.indexOf(over.id))
+    setSectionOrder(next)
+    localStorage.setItem('tradeFormSectionOrder', JSON.stringify(next))
+    await supabase.from('user_settings').upsert(
+      { user_id: user.id, form_section_order: next },
+      { onConflict: 'user_id' }
+    )
   }
 
   // Paste from clipboard handler
@@ -415,6 +417,10 @@ export default function TradeForm() {
         setFormData(prev => ({ ...prev, risk_pct: data.default_risk_pct.toString() }))
       }
       if (data.exit_modes?.length) setExitModes(data.exit_modes)
+      if (data.form_section_order?.length) {
+        setSectionOrder(data.form_section_order)
+        localStorage.setItem('tradeFormSectionOrder', JSON.stringify(data.form_section_order))
+      }
     }
   }
 

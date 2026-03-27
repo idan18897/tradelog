@@ -121,20 +121,22 @@ export default function Settings() {
   const [toast, setToast] = useState('')
   const [visible, setVisible] = useState(false)
   const [activeTab, setActiveTab] = useState('trading')
+  const DEFAULT_SETTINGS_ORDER = ['confirmations', 'pairs', 'risk', 'exitModes']
   const [sectionOrder, setSectionOrder] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('settings_section_order')) || ['confirmations', 'pairs', 'risk', 'exitModes'] }
-    catch { return ['confirmations', 'pairs', 'risk', 'exitModes'] }
+    try { return JSON.parse(localStorage.getItem('settings_section_order')) || DEFAULT_SETTINGS_ORDER }
+    catch { return DEFAULT_SETTINGS_ORDER }
   })
 
-  function handleSectionDragEnd(event) {
+  async function handleSectionDragEnd(event) {
     const { active, over } = event
-    if (active && over && active.id !== over.id) {
-      setSectionOrder(prev => {
-        const next = arrayMove(prev, prev.indexOf(active.id), prev.indexOf(over.id))
-        localStorage.setItem('settings_section_order', JSON.stringify(next))
-        return next
-      })
-    }
+    if (!active || !over || active.id === over.id) return
+    const next = arrayMove(sectionOrder, sectionOrder.indexOf(active.id), sectionOrder.indexOf(over.id))
+    setSectionOrder(next)
+    localStorage.setItem('settings_section_order', JSON.stringify(next))
+    await supabase.from('user_settings').upsert(
+      { user_id: user.id, settings_section_order: next },
+      { onConflict: 'user_id' }
+    )
   }
 
   // Change password
@@ -240,6 +242,10 @@ export default function Settings() {
       if (data.long_color) setLongColor(data.long_color)
       if (data.short_color) setShortColor(data.short_color)
       if (data.exit_modes?.length) setExitModes(data.exit_modes)
+      if (data.settings_section_order?.length) {
+        setSectionOrder(data.settings_section_order)
+        localStorage.setItem('settings_section_order', JSON.stringify(data.settings_section_order))
+      }
     } else {
       setPairs(DEFAULT_PAIRS)
     }
