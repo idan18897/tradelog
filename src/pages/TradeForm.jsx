@@ -732,8 +732,8 @@ export default function TradeForm() {
                         <div><label style={labelStyle}>R:R</label><input readOnly value={rr ? `1:${rr}` : '--'} style={{ ...inputStyle, color: rr ? 'var(--accent)' : 'var(--text-muted)', cursor: 'default', opacity: 0.8 }} /></div>
                         <div><label style={labelStyle}>Potential R:R</label><input type="number" step="0.1" min="0" placeholder="1:?" value={formData.pot_rr} onChange={e => handleField('pot_rr', e.target.value)} style={inputStyle} /></div>
                         <div>
-                          <label style={labelStyle}>{t.slPips}{formData.sl_pips && <span style={{ fontSize: '10px', color: 'var(--accent)', marginRight: '6px', fontWeight: 400 }}>⚡ auto</span>}</label>
-                          <input type="number" step="any" value={formData.sl_pips} readOnly style={{ ...inputStyle, borderColor: formData.sl_pips ? 'var(--accent)' : 'var(--input-border)', cursor: 'default', opacity: 0.8 }} placeholder="Auto" />
+                          <label style={labelStyle}>{t.slPips}{formData.sl_pips && parseFloat(formData.entry) && parseFloat(formData.sl) && <span style={{ fontSize: '10px', color: 'var(--accent)', marginRight: '6px', fontWeight: 400 }}>⚡ auto</span>}</label>
+                          <input type="number" step="any" value={formData.sl_pips} onChange={e => handleField('sl_pips', e.target.value)} style={{ ...inputStyle, borderColor: formData.sl_pips ? 'var(--accent)' : 'var(--input-border)' }} placeholder="Auto" />
                         </div>
                         <div><label style={labelStyle}>{t.risk}</label><input type="number" step="any" value={formData.risk_pct} onChange={e => handleField('risk_pct', e.target.value)} style={inputStyle} placeholder="0.5" /></div>
                       </div>
