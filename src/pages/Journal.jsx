@@ -580,6 +580,28 @@ export default function Journal() {
   const missedAvgRR = mMissedTrades.length ? (mMissedTrades.reduce((s, t) => s + (Number(t.pot_rr) || Number(t.rr_potential) || 0), 0) / mMissedTrades.length).toFixed(1) : '0'
   const missedTotalPotPnL = mMissedTrades.reduce((s, t) => s + computeMissedPotGain(t), 0)
 
+  // Live tab dashboard stats (month-filtered)
+  const liveSL = mLiveTrades.filter(t => t.outcome === 'SL')
+  const liveBE = mLiveTrades.filter(t => t.outcome === 'BE')
+  const liveWins = mLiveTPTrades
+  const grossProfit = liveWins.reduce((s, t) => s + computePnL(t), 0)
+  const grossLoss = liveSL.reduce((s, t) => s + Math.abs(computePnL(t)), 0)
+  const liveProfitFactor = grossLoss > 0 ? (grossProfit / grossLoss).toFixed(2) : liveWins.length > 0 ? '∞' : '--'
+  const liveAvgWin = liveWins.length ? (grossProfit / liveWins.length).toFixed(2) : '0'
+  const liveAvgLoss = liveSL.length ? (grossLoss / liveSL.length).toFixed(2) : '0'
+  const livePnLs = mLiveTrades.map(t => computePnL(t)).filter(v => v !== 0)
+  const liveBestTrade = livePnLs.length ? Math.max(...livePnLs) : null
+  const liveWorstTrade = livePnLs.length ? Math.min(...livePnLs) : null
+  const liveSorted = [...mLiveTrades].filter(t => ['TP','Partial TP','SL'].includes(t.outcome))
+    .sort((a, b) => new Date(a.date + 'T' + (a.time || '00:00')) - new Date(b.date + 'T' + (b.time || '00:00')))
+  let streak = 0, streakType = null
+  for (let i = liveSorted.length - 1; i >= 0; i--) {
+    const isWin = liveSorted[i].outcome === 'TP' || liveSorted[i].outcome === 'Partial TP'
+    if (streakType === null) streakType = isWin ? 'W' : 'L'
+    if ((isWin && streakType === 'W') || (!isWin && streakType === 'L')) streak++
+    else break
+  }
+
   // Combined = all live + all missed (full picture)
   const combinedTrades = [...liveTrades, ...missedTrades].sort((a, b) =>
     new Date(b.date + 'T' + (b.time || '00:00')) - new Date(a.date + 'T' + (a.time || '00:00'))
@@ -795,6 +817,76 @@ export default function Journal() {
                 {missedCount} missed opportunities · Add them via "New Trade" → Missed
               </p>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Mini dashboard — Live tab */}
+      {activeTab === 'live' && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '16px' }} className="fade-in">
+          {/* Performance card */}
+          <div style={{ background: 'var(--card)', border: '2px solid var(--accent)', borderRadius: '18px', padding: '18px', boxShadow: 'var(--shadow)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent)', display: 'inline-block' }} />
+              <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent)' }}>Performance</span>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{mLiveTrades.length} trades</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div>
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>Total P&L</p>
+                <p style={{ fontSize: '20px', fontWeight: 700, color: liveTotalPnL >= 0 ? '#4ade80' : '#f87171' }}>
+                  {liveTotalPnL >= 0 ? '+' : ''}{liveTotalPnL.toFixed(2)}%
+                </p>
+              </div>
+              <div>
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>Win Rate</p>
+                <p style={{ fontSize: '20px', fontWeight: 700, color: liveWinRate >= 60 ? '#4ade80' : liveWinRate >= 45 ? '#f59e0b' : '#f87171' }}>
+                  {liveWinRate}%
+                </p>
+              </div>
+              <div>
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>Avg R:R</p>
+                <p style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text)' }}>1:{liveAvgRR}</p>
+              </div>
+              <div>
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>Profit Factor</p>
+                <p style={{ fontSize: '20px', fontWeight: 700, color: liveProfitFactor === '--' ? 'var(--text-muted)' : parseFloat(liveProfitFactor) >= 1.5 ? '#4ade80' : parseFloat(liveProfitFactor) >= 1 ? '#f59e0b' : '#f87171' }}>
+                  {liveProfitFactor}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Trade Analysis card */}
+          <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '18px', padding: '18px', boxShadow: 'var(--shadow)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+              <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text)' }}>Trade Analysis</span>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{liveWins.length}W · {liveSL.length}L · {liveBE.length}BE</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div>
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>Avg Win</p>
+                <p style={{ fontSize: '20px', fontWeight: 700, color: '#4ade80' }}>+{liveAvgWin}%</p>
+              </div>
+              <div>
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>Avg Loss</p>
+                <p style={{ fontSize: '20px', fontWeight: 700, color: '#f87171' }}>-{liveAvgLoss}%</p>
+              </div>
+              <div>
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>Best Trade</p>
+                <p style={{ fontSize: '20px', fontWeight: 700, color: '#4ade80' }}>
+                  {liveBestTrade !== null ? `+${liveBestTrade.toFixed(2)}%` : '--'}
+                </p>
+              </div>
+              <div>
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>
+                  {streakType ? `${streak} ${streakType === 'W' ? 'Win' : 'Loss'} Streak` : 'Streak'}
+                </p>
+                <p style={{ fontSize: '20px', fontWeight: 700, color: streakType === 'W' ? '#4ade80' : streakType === 'L' ? '#f87171' : 'var(--text-muted)' }}>
+                  {streak > 0 ? `${streakType === 'W' ? '🔥' : ''}${streak}×` : '--'}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       )}
