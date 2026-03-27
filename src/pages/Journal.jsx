@@ -187,10 +187,18 @@ function DetailField({ label, value, children }) {
 const CAL_DAY_HEADERS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 function calPnL(tr) {
-  if (tr.outcome === 'TP') return (tr.rr_potential || 0) * (tr.risk_pct || 0.5)
-  if (tr.outcome === 'Partial TP') return (tr.rr_potential || 0) * (tr.risk_pct || 0.5) * 0.5
-  if (tr.outcome === 'SL') return -(tr.risk_pct || 0.5)
-  return 0
+  const rr = Number(tr.rr_potential) || 0
+  const risk = Number(tr.risk_pct) || 0.5
+  if (tr.outcome === 'SL') return -risk
+  if (tr.outcome !== 'TP' && tr.outcome !== 'Partial TP') return 0
+  const isPartial = tr.outcome === 'Partial TP'
+  if (tr.sl_to_be && tr.exit_levels?.length) {
+    let rem = 100, gain = 0
+    for (const lv of tr.exit_levels) { gain += (lv.pct / 100) * lv.rr * risk; rem -= lv.pct }
+    if (!isPartial) gain += (rem / 100) * rr * risk
+    return gain
+  }
+  return isPartial ? rr * risk * 0.5 : rr * risk
 }
 
 // secondaryTrades = missed trades shown in amber overlay (optional)
@@ -547,12 +555,7 @@ export default function Journal() {
   )
 
   // Comparison stats — filtered to calMonth for Combined tab
-  const computePnL = t => {
-    if (t.outcome === 'TP') return (t.rr_potential || 0) * (t.risk_pct || 0.5)
-    if (t.outcome === 'Partial TP') return (t.rr_potential || 0) * (t.risk_pct || 0.5) * 0.5
-    if (t.outcome === 'SL') return -(t.risk_pct || 0.5)
-    return 0
-  }
+  const computePnL = t => calPnL(t)
   const inCalMonth = t => t.date?.slice(0, 7) === calMonth
   const mLiveTrades = liveTrades.filter(inCalMonth)
   const mLiveTPTrades = mLiveTrades.filter(t => t.outcome === 'TP' || t.outcome === 'Partial TP')
