@@ -215,8 +215,7 @@ function TradeCalendar({ trades, secondaryTrades, calMonth, onMonthChange, filte
       if (!tr.date || tr.date.slice(0, 7) !== calMonth) return
       if (!missedStats[tr.date]) missedStats[tr.date] = { count: 0, potPnL: 0 }
       missedStats[tr.date].count++
-      console.log('[missed]', tr.date, 'pot_rr=', tr.pot_rr, 'rr_potential=', tr.rr_potential, 'risk=', tr.risk_pct, 'sl_to_be=', tr.sl_to_be, 'exit_levels=', tr.exit_levels)
-      const fullRR = Number(tr.pot_rr) || Number(tr.rr_potential) || 0
+const fullRR = Number(tr.pot_rr) || Number(tr.rr_potential) || 0
       const risk = Number(tr.risk_pct) || 0.5
       let potGain = 0
       if (fullRR > 0) {
@@ -1103,6 +1102,25 @@ export default function Journal() {
             <DetailField label={t.slPips} value={selectedTrade.sl_pips} />
             <DetailField label={t.rrPotential || 'R:R Potential'} value={selectedTrade.rr_potential ? `1:${selectedTrade.rr_potential}` : '--'} />
             <DetailField label={t.risk} value={selectedTrade.risk_pct ? `${selectedTrade.risk_pct}%` : '--'} />
+            {selectedTrade.trade_type === 'missed' && (() => {
+              const fullRR = Number(selectedTrade.pot_rr) || Number(selectedTrade.rr_potential) || 0
+              const risk = Number(selectedTrade.risk_pct) || 0.5
+              if (!fullRR) return null
+              let gain = 0
+              if (selectedTrade.sl_to_be && selectedTrade.exit_levels?.length) {
+                let rem = 100
+                for (const lv of selectedTrade.exit_levels) { gain += (lv.pct / 100) * lv.rr * risk; rem -= lv.pct }
+                gain += (rem / 100) * fullRR * risk
+              } else {
+                gain = fullRR * risk
+              }
+              return (
+                <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '10px', marginTop: '4px' }}>
+                  <span style={{ fontSize: '12px', color: '#f59e0b' }}>Potential Gain if entered:</span>
+                  <span style={{ fontSize: '18px', fontWeight: 700, color: '#f59e0b' }}>+{gain.toFixed(2)}%</span>
+                </div>
+              )
+            })()}
           </div>
 
           {selectedTrade.sl_to_be && (
