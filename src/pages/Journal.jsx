@@ -425,7 +425,7 @@ const fullRR = Number(tr.pot_rr) || Number(tr.rr_potential) || 0
                     )}
                     {hasTrades && hasMissed && missed.potPnL > 0 && (
                       <div style={{ fontSize: '11px', fontWeight: 600, color: '#f59e0b', marginTop: '2px' }}>
-                        +{missed.potPnL.toFixed(2)}% missed
+                        +{missed.potPnL.toFixed(2)}%
                       </div>
                     )}
                   </div>
@@ -459,7 +459,7 @@ const fullRR = Number(tr.pot_rr) || Number(tr.rr_potential) || 0
                     )}
                     {weekMissedPnL > 0 && (
                       <span style={{ fontSize: '11px', fontWeight: 700, color: '#f59e0b', textAlign: 'center' }}>
-                        +{weekMissedPnL.toFixed(2)}% missed
+                        +{weekMissedPnL.toFixed(2)}%
                       </span>
                     )}
                   </>
