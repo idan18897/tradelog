@@ -395,7 +395,7 @@ function TradeCalendar({ trades, secondaryTrades, calMonth, onMonthChange, filte
                             {missed.count} missed
                           </span>
                         )}
-                        {hasMissed && missed.potPnL > 0 && !hasTrades && (
+                        {hasMissed && missed.potPnL > 0 && (
                           <span style={{ fontSize: '12px', fontWeight: 700, color: '#f59e0b', lineHeight: 1.2 }}>
                             +{missed.potPnL.toFixed(2)}%
                           </span>
