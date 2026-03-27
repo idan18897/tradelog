@@ -564,6 +564,22 @@ export default function Journal() {
   const captureRate = mBacktestTrades.length ? Math.round(mLiveTPTrades.length / mBacktestTrades.length * 100) : 0
   const missedCount = mMissedTrades.length
 
+  const computeMissedPotGain = tr => {
+    const fullRR = Number(tr.pot_rr) || Number(tr.rr_potential) || 0
+    const risk = Number(tr.risk_pct) || 0.5
+    if (!fullRR) return 0
+    if (tr.sl_to_be && tr.exit_levels?.length) {
+      let rem = 100, gain = 0
+      for (const lv of tr.exit_levels) { gain += (lv.pct / 100) * lv.rr * risk; rem -= lv.pct }
+      return gain + (rem / 100) * fullRR * risk
+    }
+    return fullRR * risk
+  }
+  const takenAvgRR = mLiveTPTrades.length ? (mLiveTPTrades.reduce((s, t) => s + (t.rr_potential || 0), 0) / mLiveTPTrades.length).toFixed(1) : '0'
+  const takenTotalPnL = mLiveTPTrades.reduce((s, t) => s + computePnL(t), 0)
+  const missedAvgRR = mMissedTrades.length ? (mMissedTrades.reduce((s, t) => s + (Number(t.pot_rr) || Number(t.rr_potential) || 0), 0) / mMissedTrades.length).toFixed(1) : '0'
+  const missedTotalPotPnL = mMissedTrades.reduce((s, t) => s + computeMissedPotGain(t), 0)
+
   // Combined = all live + all missed (full picture)
   const combinedTrades = [...liveTrades, ...missedTrades].sort((a, b) =>
     new Date(b.date + 'T' + (b.time || '00:00')) - new Date(a.date + 'T' + (a.time || '00:00'))
@@ -793,6 +809,68 @@ export default function Journal() {
             filterDay={filterDay}
             onDayClick={handleDayClick}
           />
+        </div>
+      )}
+
+      {/* Stats panels — Opportunity Log tab */}
+      {activeTab === 'backtest' && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '16px' }} className="fade-in">
+          {/* Trades Taken */}
+          <div style={{ background: 'var(--card)', border: '2px solid var(--accent)', borderRadius: '18px', padding: '18px', boxShadow: 'var(--shadow)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent)', display: 'inline-block' }} />
+              <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent)' }}>Trades Taken</span>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{mLiveTPTrades.length} trades</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div>
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>Total P&L</p>
+                <p style={{ fontSize: '20px', fontWeight: 700, color: takenTotalPnL >= 0 ? '#4ade80' : '#f87171' }}>
+                  {takenTotalPnL >= 0 ? '+' : ''}{takenTotalPnL.toFixed(1)}%
+                </p>
+              </div>
+              <div>
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>Avg R:R</p>
+                <p style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text)' }}>1:{takenAvgRR}</p>
+              </div>
+              <div>
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>Capture Rate</p>
+                <p style={{ fontSize: '20px', fontWeight: 700, color: captureRate >= 70 ? '#4ade80' : captureRate >= 50 ? '#f59e0b' : '#f87171' }}>{captureRate}%</p>
+              </div>
+              <div>
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>TP Count</p>
+                <p style={{ fontSize: '20px', fontWeight: 700, color: '#4ade80' }}>{mLiveTPTrades.length}</p>
+              </div>
+            </div>
+          </div>
+          {/* Trades Missed */}
+          <div style={{ background: 'var(--card)', border: '2px solid #f59e0b', borderRadius: '18px', padding: '18px', boxShadow: 'var(--shadow)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b', display: 'inline-block' }} />
+              <span style={{ fontSize: '13px', fontWeight: 700, color: '#f59e0b' }}>Trades Missed</span>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{mMissedTrades.length} trades</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div>
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>Potential P&L</p>
+                <p style={{ fontSize: '20px', fontWeight: 700, color: '#f59e0b' }}>+{missedTotalPotPnL.toFixed(1)}%</p>
+              </div>
+              <div>
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>Avg R:R</p>
+                <p style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text)' }}>1:{missedAvgRR}</p>
+              </div>
+              <div>
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>Missed Count</p>
+                <p style={{ fontSize: '20px', fontWeight: 700, color: '#f87171' }}>{mMissedTrades.length}</p>
+              </div>
+              <div>
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>Missed Days</p>
+                <p style={{ fontSize: '20px', fontWeight: 700, color: '#f59e0b' }}>
+                  {new Set(mMissedTrades.map(t => t.date)).size}
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
