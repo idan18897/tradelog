@@ -219,12 +219,13 @@ const fullRR = Number(tr.rr_potential) || Number(tr.pot_rr) || 0
       const risk = Number(tr.risk_pct) || 0.5
       let potGain = 0
       if (fullRR > 0) {
+        const isPartial = tr.outcome === 'Partial TP'
         if (tr.sl_to_be && tr.exit_levels?.length) {
           let rem = 100
           for (const lv of tr.exit_levels) { potGain += (lv.pct / 100) * lv.rr * risk; rem -= lv.pct }
-          potGain += (rem / 100) * fullRR * risk
+          if (!isPartial) potGain += (rem / 100) * fullRR * risk
         } else {
-          potGain = fullRR * risk
+          potGain = isPartial ? fullRR * risk * 0.5 : fullRR * risk
         }
       }
       missedStats[tr.date].potPnL += potGain
@@ -568,12 +569,14 @@ export default function Journal() {
     const fullRR = Number(tr.rr_potential) || Number(tr.pot_rr) || 0
     const risk = Number(tr.risk_pct) || 0.5
     if (!fullRR) return 0
+    const isPartial = tr.outcome === 'Partial TP'
     if (tr.sl_to_be && tr.exit_levels?.length) {
       let rem = 100, gain = 0
       for (const lv of tr.exit_levels) { gain += (lv.pct / 100) * lv.rr * risk; rem -= lv.pct }
-      return gain + (rem / 100) * fullRR * risk
+      if (!isPartial) gain += (rem / 100) * fullRR * risk
+      return gain
     }
-    return fullRR * risk
+    return isPartial ? fullRR * risk * 0.5 : fullRR * risk
   }
   const takenAvgRR = mLiveTPTrades.length ? (mLiveTPTrades.reduce((s, t) => s + (t.rr_potential || 0), 0) / mLiveTPTrades.length).toFixed(1) : '0'
   const takenTotalPnL = mLiveTPTrades.reduce((s, t) => s + computePnL(t), 0)
@@ -1296,13 +1299,14 @@ export default function Journal() {
               const fullRR = Number(selectedTrade.rr_potential) || Number(selectedTrade.pot_rr) || 0
               const risk = Number(selectedTrade.risk_pct) || 0.5
               if (!fullRR) return null
+              const isPartial = selectedTrade.outcome === 'Partial TP'
               let gain = 0
               if (selectedTrade.sl_to_be && selectedTrade.exit_levels?.length) {
                 let rem = 100
                 for (const lv of selectedTrade.exit_levels) { gain += (lv.pct / 100) * lv.rr * risk; rem -= lv.pct }
-                gain += (rem / 100) * fullRR * risk
+                if (!isPartial) gain += (rem / 100) * fullRR * risk
               } else {
-                gain = fullRR * risk
+                gain = isPartial ? fullRR * risk * 0.5 : fullRR * risk
               }
               return (
                 <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '10px', marginTop: '4px' }}>

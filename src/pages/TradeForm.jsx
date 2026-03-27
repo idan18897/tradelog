@@ -748,13 +748,16 @@ export default function TradeForm() {
                         {formData.trade_type === 'missed' && (rr || formData.pot_rr) && parseFloat(rr || formData.pot_rr) > 0 && (() => {
                           const fullRR = parseFloat(rr || formData.pot_rr)
                           const risk = parseFloat(formData.risk_pct || 0.5)
+                          const isPartial = formData.outcome === 'Partial TP'
                           let gain = 0
                           if (formData.sl_to_be && formData.exit_levels?.length) {
+                            // Always count exit levels (taken at partial)
                             let rem = 100
                             for (const lv of formData.exit_levels) { gain += (lv.pct / 100) * lv.rr * risk; rem -= lv.pct }
-                            gain += (rem / 100) * fullRR * risk
+                            // Partial TP = remaining hit BE (0), TP = remaining runs to target
+                            if (!isPartial) gain += (rem / 100) * fullRR * risk
                           } else {
-                            gain = fullRR * risk
+                            gain = isPartial ? fullRR * risk * 0.5 : fullRR * risk
                           }
                           return (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '10px', gridColumn: isMobile ? '1' : '1 / -1' }}>
