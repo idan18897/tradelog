@@ -213,8 +213,10 @@ function TradeCalendar({ trades, secondaryTrades, calMonth, onMonthChange, filte
   if (secondaryTrades) {
     secondaryTrades.forEach(tr => {
       if (!tr.date || tr.date.slice(0, 7) !== calMonth) return
-      if (!missedStats[tr.date]) missedStats[tr.date] = { count: 0 }
+      if (!missedStats[tr.date]) missedStats[tr.date] = { count: 0, potPnL: 0 }
       missedStats[tr.date].count++
+      const potRR = tr.pot_rr || tr.rr_potential || 0
+      missedStats[tr.date].potPnL += potRR * (tr.risk_pct || 0.5)
     })
   }
 
@@ -391,6 +393,11 @@ function TradeCalendar({ trades, secondaryTrades, calMonth, onMonthChange, filte
                         {hasMissed && (
                           <span style={{ fontSize: '10px', color: '#f59e0b', lineHeight: 1.2 }}>
                             {missed.count} missed
+                          </span>
+                        )}
+                        {hasMissed && missed.potPnL > 0 && !hasTrades && (
+                          <span style={{ fontSize: '12px', fontWeight: 700, color: '#f59e0b', lineHeight: 1.2 }}>
+                            +{missed.potPnL.toFixed(2)}%
                           </span>
                         )}
                       </div>

@@ -739,6 +739,14 @@ export default function TradeForm() {
                         <div><label style={labelStyle}>TP</label><input type="number" step="any" value={formData.tp} onChange={e => handleField('tp', e.target.value)} style={inputStyle} placeholder="0.00000" /></div>
                         <div><label style={labelStyle}>R:R</label><input readOnly value={rr ? `1:${rr}` : '--'} style={{ ...inputStyle, color: rr ? 'var(--accent)' : 'var(--text-muted)', cursor: 'default', opacity: 0.8 }} /></div>
                         <div><label style={labelStyle}>Potential R:R</label><input type="number" step="0.1" min="0" placeholder="1:?" value={formData.pot_rr} onChange={e => handleField('pot_rr', e.target.value)} style={inputStyle} /></div>
+                        {formData.trade_type === 'missed' && formData.pot_rr && parseFloat(formData.pot_rr) > 0 && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '10px', gridColumn: isMobile ? '1' : '1 / -1' }}>
+                            <span style={{ fontSize: '12px', color: '#f59e0b' }}>Potential Gain if entered:</span>
+                            <span style={{ fontSize: '16px', fontWeight: 700, color: '#f59e0b' }}>
+                              +{(parseFloat(formData.pot_rr) * parseFloat(formData.risk_pct || 0.5)).toFixed(2)}%
+                            </span>
+                          </div>
+                        )}
                         <div>
                           <label style={labelStyle}>{t.slPips}{formData.sl_pips && parseFloat(formData.entry) && parseFloat(formData.sl) && <span style={{ fontSize: '10px', color: 'var(--accent)', marginRight: '6px', fontWeight: 400 }}>⚡ auto</span>}</label>
                           <input type="number" step="any" value={formData.sl_pips} onChange={e => handleField('sl_pips', e.target.value)} style={{ ...inputStyle, borderColor: formData.sl_pips ? 'var(--accent)' : 'var(--input-border)' }} placeholder="Auto" />
