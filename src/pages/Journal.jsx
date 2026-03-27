@@ -470,11 +470,13 @@ export default function Journal() {
   const [filterOutcome, setFilterOutcome] = useState('All')
   const [filterDirection, setFilterDirection] = useState('All')
   const [selectedTrade, setSelectedTrade] = useState(null)
-  const [activeTab, setActiveTab] = useState('live')
+  const [activeTab, setActiveTab] = useState(() => localStorage.getItem('journal_tab') || 'live')
   const [lightbox, setLightbox] = useState(null) // { src, label }
   const [filterMonth, setFilterMonth] = useState('All')
   const [filterDay, setFilterDay] = useState(null)
   const [calMonth, setCalMonth] = useState(() => {
+    const saved = localStorage.getItem('journal_calMonth')
+    if (saved) return saved
     const now = new Date()
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   })
@@ -570,6 +572,7 @@ export default function Journal() {
 
   function handleCalMonthChange(ym) {
     setCalMonth(ym)
+    localStorage.setItem('journal_calMonth', ym)
     setFilterDay(null)
     setFilterMonth(ym)
   }
@@ -610,7 +613,7 @@ export default function Journal() {
         ].map(tab => (
           <button
             key={tab.key}
-            onClick={() => { setActiveTab(tab.key); setSelectedTrade(null) }}
+            onClick={() => { setActiveTab(tab.key); localStorage.setItem('journal_tab', tab.key); setSelectedTrade(null) }}
             style={{
               padding: '10px 20px',
               fontSize: '13.5px',
