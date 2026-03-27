@@ -215,8 +215,19 @@ function TradeCalendar({ trades, secondaryTrades, calMonth, onMonthChange, filte
       if (!tr.date || tr.date.slice(0, 7) !== calMonth) return
       if (!missedStats[tr.date]) missedStats[tr.date] = { count: 0, potPnL: 0 }
       missedStats[tr.date].count++
-      const potRR = tr.pot_rr || tr.rr_potential || 0
-      missedStats[tr.date].potPnL += potRR * (tr.risk_pct || 0.5)
+      const fullRR = Number(tr.pot_rr) || Number(tr.rr_potential) || 0
+      const risk = Number(tr.risk_pct) || 0.5
+      let potGain = 0
+      if (fullRR > 0) {
+        if (tr.sl_to_be && tr.exit_levels?.length) {
+          let rem = 100
+          for (const lv of tr.exit_levels) { potGain += (lv.pct / 100) * lv.rr * risk; rem -= lv.pct }
+          potGain += (rem / 100) * fullRR * risk
+        } else {
+          potGain = fullRR * risk
+        }
+      }
+      missedStats[tr.date].potPnL += potGain
     })
   }
 
