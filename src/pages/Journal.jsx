@@ -215,7 +215,7 @@ function TradeCalendar({ trades, secondaryTrades, calMonth, onMonthChange, filte
       if (!tr.date || tr.date.slice(0, 7) !== calMonth) return
       if (!missedStats[tr.date]) missedStats[tr.date] = { count: 0, potPnL: 0 }
       missedStats[tr.date].count++
-const fullRR = Number(tr.pot_rr) || Number(tr.rr_potential) || 0
+const fullRR = Number(tr.rr_potential) || Number(tr.pot_rr) || 0
       const risk = Number(tr.risk_pct) || 0.5
       let potGain = 0
       if (fullRR > 0) {
@@ -565,7 +565,7 @@ export default function Journal() {
   const missedCount = mMissedTrades.length
 
   const computeMissedPotGain = tr => {
-    const fullRR = Number(tr.pot_rr) || Number(tr.rr_potential) || 0
+    const fullRR = Number(tr.rr_potential) || Number(tr.pot_rr) || 0
     const risk = Number(tr.risk_pct) || 0.5
     if (!fullRR) return 0
     if (tr.sl_to_be && tr.exit_levels?.length) {
@@ -577,7 +577,7 @@ export default function Journal() {
   }
   const takenAvgRR = mLiveTPTrades.length ? (mLiveTPTrades.reduce((s, t) => s + (t.rr_potential || 0), 0) / mLiveTPTrades.length).toFixed(1) : '0'
   const takenTotalPnL = mLiveTPTrades.reduce((s, t) => s + computePnL(t), 0)
-  const missedAvgRR = mMissedTrades.length ? (mMissedTrades.reduce((s, t) => s + (Number(t.pot_rr) || Number(t.rr_potential) || 0), 0) / mMissedTrades.length).toFixed(1) : '0'
+  const missedAvgRR = mMissedTrades.length ? (mMissedTrades.reduce((s, t) => s + (Number(t.rr_potential) || Number(t.pot_rr) || 0), 0) / mMissedTrades.length).toFixed(1) : '0'
   const missedTotalPotPnL = mMissedTrades.reduce((s, t) => s + computeMissedPotGain(t), 0)
 
   // Live tab dashboard stats (month-filtered)
@@ -1293,7 +1293,7 @@ export default function Journal() {
             <DetailField label={t.rrPotential || 'R:R Potential'} value={selectedTrade.rr_potential ? `1:${selectedTrade.rr_potential}` : '--'} />
             <DetailField label={t.risk} value={selectedTrade.risk_pct ? `${selectedTrade.risk_pct}%` : '--'} />
             {selectedTrade.trade_type === 'missed' && (() => {
-              const fullRR = Number(selectedTrade.pot_rr) || Number(selectedTrade.rr_potential) || 0
+              const fullRR = Number(selectedTrade.rr_potential) || Number(selectedTrade.pot_rr) || 0
               const risk = Number(selectedTrade.risk_pct) || 0.5
               if (!fullRR) return null
               let gain = 0

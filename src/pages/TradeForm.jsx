@@ -739,8 +739,8 @@ export default function TradeForm() {
                         <div><label style={labelStyle}>TP</label><input type="number" step="any" value={formData.tp} onChange={e => handleField('tp', e.target.value)} style={inputStyle} placeholder="0.00000" /></div>
                         <div><label style={labelStyle}>R:R</label><input readOnly value={rr ? `1:${rr}` : '--'} style={{ ...inputStyle, color: rr ? 'var(--accent)' : 'var(--text-muted)', cursor: 'default', opacity: 0.8 }} /></div>
                         <div><label style={labelStyle}>Potential R:R</label><input type="number" step="0.1" min="0" placeholder="1:?" value={formData.pot_rr} onChange={e => handleField('pot_rr', e.target.value)} style={inputStyle} /></div>
-                        {formData.trade_type === 'missed' && (formData.pot_rr || rr) && parseFloat(formData.pot_rr || rr) > 0 && (() => {
-                          const fullRR = parseFloat(formData.pot_rr || rr)
+                        {formData.trade_type === 'missed' && (rr || formData.pot_rr) && parseFloat(rr || formData.pot_rr) > 0 && (() => {
+                          const fullRR = parseFloat(rr || formData.pot_rr)
                           const risk = parseFloat(formData.risk_pct || 0.5)
                           let gain = 0
                           if (formData.sl_to_be && formData.exit_levels?.length) {
