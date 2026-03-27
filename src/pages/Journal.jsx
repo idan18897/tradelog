@@ -347,10 +347,12 @@ const fullRR = Number(tr.pot_rr) || Number(tr.rr_potential) || 0
           // Compute weekly P&L
           let weekPnL = 0
           let weekHasTrades = false
+          let weekMissedPnL = 0
           weekCells.forEach(day => {
             if (!day) return
             const ds = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
             if (dayStats[ds]) { weekPnL += dayStats[ds].pnl; weekHasTrades = true }
+            if (missedStats[ds]) { weekMissedPnL += missedStats[ds].potPnL }
           })
 
           return (
@@ -406,11 +408,6 @@ const fullRR = Number(tr.pot_rr) || Number(tr.rr_potential) || 0
                             {missed.count} missed
                           </span>
                         )}
-                        {hasMissed && missed.potPnL > 0 && (
-                          <span style={{ fontSize: '12px', fontWeight: 700, color: '#f59e0b', lineHeight: 1.2 }}>
-                            +{missed.potPnL.toFixed(2)}%
-                          </span>
-                        )}
                       </div>
                       <span style={{ fontSize: '12px', fontWeight: 600, color: hasAny ? 'var(--text)' : 'var(--text-subtle)' }}>
                         {day}
@@ -421,6 +418,16 @@ const fullRR = Number(tr.pot_rr) || Number(tr.rr_potential) || 0
                         {pnl >= 0 ? '+' : ''}{pnl.toFixed(2)}%
                       </div>
                     )}
+                    {!hasTrades && hasMissed && missed.potPnL > 0 && (
+                      <div style={{ marginTop: '8px', fontSize: '13px', fontWeight: 700, color: '#f59e0b' }}>
+                        +{missed.potPnL.toFixed(2)}%
+                      </div>
+                    )}
+                    {hasTrades && hasMissed && missed.potPnL > 0 && (
+                      <div style={{ fontSize: '11px', fontWeight: 600, color: '#f59e0b', marginTop: '2px' }}>
+                        +{missed.potPnL.toFixed(2)}% missed
+                      </div>
+                    )}
                   </div>
                 )
               })}
@@ -429,11 +436,11 @@ const fullRR = Number(tr.pot_rr) || Number(tr.rr_potential) || 0
               <div style={{
                 minHeight: '72px',
                 borderRadius: '8px',
-                border: weekHasTrades
-                  ? `1px solid ${weekPnL >= 0 ? 'rgba(74,222,128,0.35)' : 'rgba(248,113,113,0.35)'}`
+                border: (weekHasTrades || weekMissedPnL > 0)
+                  ? `1px solid ${weekHasTrades ? (weekPnL >= 0 ? 'rgba(74,222,128,0.35)' : 'rgba(248,113,113,0.35)') : 'rgba(245,158,11,0.35)'}`
                   : '1px solid transparent',
-                background: weekHasTrades
-                  ? weekPnL >= 0 ? 'rgba(74,222,128,0.18)' : 'rgba(248,113,113,0.18)'
+                background: (weekHasTrades || weekMissedPnL > 0)
+                  ? weekHasTrades ? (weekPnL >= 0 ? 'rgba(74,222,128,0.18)' : 'rgba(248,113,113,0.18)') : 'rgba(245,158,11,0.12)'
                   : 'transparent',
                 display: 'flex',
                 flexDirection: 'column',
@@ -442,12 +449,19 @@ const fullRR = Number(tr.pot_rr) || Number(tr.rr_potential) || 0
                 gap: '4px',
                 padding: '6px 4px',
               }}>
-                {weekHasTrades && (
+                {(weekHasTrades || weekMissedPnL > 0) && (
                   <>
                     <span style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Weekly</span>
-                    <span style={{ fontSize: '13px', fontWeight: 700, color: weekPnL >= 0 ? '#4ade80' : '#f87171', textAlign: 'center' }}>
-                      {weekPnL >= 0 ? '+' : ''}{weekPnL.toFixed(2)}%
-                    </span>
+                    {weekHasTrades && (
+                      <span style={{ fontSize: '13px', fontWeight: 700, color: weekPnL >= 0 ? '#4ade80' : '#f87171', textAlign: 'center' }}>
+                        {weekPnL >= 0 ? '+' : ''}{weekPnL.toFixed(2)}%
+                      </span>
+                    )}
+                    {weekMissedPnL > 0 && (
+                      <span style={{ fontSize: '11px', fontWeight: 700, color: '#f59e0b', textAlign: 'center' }}>
+                        +{weekMissedPnL.toFixed(2)}% missed
+                      </span>
+                    )}
                   </>
                 )}
               </div>
