@@ -66,6 +66,7 @@ export default function Dashboard() {
   const [dateFilter, setDateFilter] = useState({ type: 'all', from: '', to: '' })
   const [showMissed, setShowMissed] = useState(false)
   const [customOpen, setCustomOpen] = useState(false)
+  const [hourView, setHourView] = useState('winRate') // 'winRate' | 'volume'
   const customRef = useRef(null)
 
   useEffect(() => {
@@ -985,18 +986,46 @@ export default function Dashboard() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
             <div>
               <h2 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', marginBottom: '4px' }}>Performance by Hour</h2>
-              <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Which hour do you trade best?</p>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{hourView === 'winRate' ? 'Which hour do you trade best?' : 'When are you most active?'}</p>
             </div>
-            {(() => {
-              const best = perfByHour.filter(h => h.winRate !== null).sort((a, b) => b.winRate - a.winRate)[0]
-              return best ? (
-                <div style={{ textAlign: 'end' }}>
-                  <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>Best Hour</p>
-                  <p style={{ fontSize: '16px', fontWeight: 700, color: '#4ade80' }}>{best.label}</p>
-                  <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{best.winRate}% win rate</p>
-                </div>
-              ) : null
-            })()}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {hourView === 'winRate' && (() => {
+                const best = perfByHour.filter(h => h.winRate !== null).sort((a, b) => b.winRate - a.winRate)[0]
+                return best ? (
+                  <div style={{ textAlign: 'end', marginRight: '8px' }}>
+                    <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>Best Hour</p>
+                    <p style={{ fontSize: '16px', fontWeight: 700, color: '#4ade80' }}>{best.label}</p>
+                    <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{best.winRate}% win rate</p>
+                  </div>
+                ) : null
+              })()}
+              {hourView === 'volume' && (() => {
+                const peak = [...perfByHour].sort((a, b) => b.total - a.total)[0]
+                return peak ? (
+                  <div style={{ textAlign: 'end', marginRight: '8px' }}>
+                    <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>Peak Hour</p>
+                    <p style={{ fontSize: '16px', fontWeight: 700, color: '#60a5fa' }}>{peak.label}</p>
+                    <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{peak.total} trades</p>
+                  </div>
+                ) : null
+              })()}
+              <div style={{ display: 'flex', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '20px', padding: '3px', gap: '2px' }}>
+                {[{ key: 'winRate', label: 'Win Rate' }, { key: 'volume', label: 'Volume' }].map(opt => (
+                  <button
+                    key={opt.key}
+                    onClick={() => setHourView(opt.key)}
+                    style={{
+                      padding: '4px 12px', fontSize: '12px', fontWeight: hourView === opt.key ? 600 : 400,
+                      borderRadius: '16px', border: 'none', cursor: 'pointer',
+                      background: hourView === opt.key ? 'var(--card)' : 'transparent',
+                      color: hourView === opt.key ? 'var(--text)' : 'var(--text-muted)',
+                      boxShadow: hourView === opt.key ? 'var(--shadow)' : 'none',
+                      transition: 'all 0.15s',
+                    }}
+                  >{opt.label}</button>
+                ))}
+              </div>
+            </div>
           </div>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={perfByHour} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
@@ -1010,8 +1039,8 @@ export default function Dashboard() {
                 tick={{ fill: 'var(--text-muted)', fontSize: 10 }}
                 axisLine={false}
                 tickLine={false}
-                tickFormatter={v => `${v}%`}
-                domain={[0, 100]}
+                tickFormatter={v => hourView === 'winRate' ? `${v}%` : v}
+                domain={hourView === 'winRate' ? [0, 100] : [0, 'auto']}
               />
               <Tooltip
                 content={({ active, payload }) => {
@@ -1021,10 +1050,12 @@ export default function Dashboard() {
                     <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px' }}>
                       <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text)', marginBottom: '6px' }}>{d.label}</p>
                       <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{d.total} trades · {d.tp} TP · {d.sl} SL</p>
-                      <p style={{ fontSize: '13px', fontWeight: 700, color: d.winRate >= 50 ? '#4ade80' : '#f87171', marginTop: '4px' }}>
-                        {d.winRate !== null ? `${d.winRate}% win rate` : '--'}
-                      </p>
-                      <p style={{ fontSize: '12px', color: d.pnl >= 0 ? '#4ade80' : '#f87171' }}>
+                      {hourView === 'winRate' && (
+                        <p style={{ fontSize: '13px', fontWeight: 700, color: d.winRate >= 50 ? '#4ade80' : '#f87171', marginTop: '4px' }}>
+                          {d.winRate !== null ? `${d.winRate}% win rate` : '--'}
+                        </p>
+                      )}
+                      <p style={{ fontSize: '12px', color: d.pnl >= 0 ? '#4ade80' : '#f87171', marginTop: '2px' }}>
                         {d.pnl >= 0 ? '+' : ''}{d.pnl}% P&L
                       </p>
                     </div>
@@ -1032,18 +1063,26 @@ export default function Dashboard() {
                 }}
                 cursor={{ fill: 'rgba(128,128,128,0.06)' }}
               />
-              <Bar dataKey="winRate" radius={[4, 4, 0, 0]} maxBarSize={40}>
-                {perfByHour.map((h, i) => (
-                  <Cell
-                    key={i}
-                    fill={h.winRate === null ? '#6b7280'
-                      : h.winRate >= 60 ? '#4ade80'
-                      : h.winRate >= 40 ? '#f59e0b'
-                      : '#f87171'}
-                    opacity={0.85}
-                  />
-                ))}
-              </Bar>
+              {hourView === 'winRate' ? (
+                <Bar dataKey="winRate" radius={[4, 4, 0, 0]} maxBarSize={40}>
+                  {perfByHour.map((h, i) => (
+                    <Cell
+                      key={i}
+                      fill={h.winRate === null ? '#6b7280'
+                        : h.winRate >= 60 ? '#4ade80'
+                        : h.winRate >= 40 ? '#f59e0b'
+                        : '#f87171'}
+                      opacity={0.85}
+                    />
+                  ))}
+                </Bar>
+              ) : (
+                <Bar dataKey="total" radius={[4, 4, 0, 0]} maxBarSize={40}>
+                  {perfByHour.map((h, i) => (
+                    <Cell key={i} fill="#60a5fa" opacity={0.7 + (h.total / Math.max(...perfByHour.map(x => x.total))) * 0.3} />
+                  ))}
+                </Bar>
+              )}
             </BarChart>
           </ResponsiveContainer>
           {/* Session overlays legend */}

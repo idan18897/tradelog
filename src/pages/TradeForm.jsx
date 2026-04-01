@@ -306,6 +306,7 @@ export default function TradeForm() {
   const [formData, setFormData] = useState({
     date: today(),
     time: currentTime(),
+    exit_time: '',
     pair: 'XAUUSD',
     direction: 'Long',
     entry: '',
@@ -447,6 +448,7 @@ export default function TradeForm() {
     setFormData({
       date: data.date || today(),
       time: data.time || currentTime(),
+      exit_time: data.exit_time || '',
       pair: data.pair || 'XAUUSD',
       direction: data.direction || 'Long',
       entry: data.entry?.toString() || '',
@@ -548,6 +550,7 @@ export default function TradeForm() {
         date: formData.date,
         day: getDayName(formData.date),
         time: formData.time,
+        exit_time: formData.exit_time || null,
         pair: formData.pair,
         direction: formData.direction,
         entry: formData.entry ? parseFloat(formData.entry) : null,
@@ -598,6 +601,19 @@ export default function TradeForm() {
   function setTimeMinutes(m) {
     const mm = String(Math.min(59, Math.max(0, parseInt(m) || 0))).padStart(2, '0')
     handleField('time', `${timeHours}:${mm}`)
+  }
+
+  // Exit time helpers
+  const exitTimeHours = formData.exit_time ? formData.exit_time.split(':')[0] : ''
+  const exitTimeMinutes = formData.exit_time ? formData.exit_time.split(':')[1] : ''
+
+  function setExitTimeHours(h) {
+    const hh = String(Math.min(23, Math.max(0, parseInt(h) || 0))).padStart(2, '0')
+    handleField('exit_time', `${hh}:${exitTimeMinutes || '00'}`)
+  }
+  function setExitTimeMinutes(m) {
+    const mm = String(Math.min(59, Math.max(0, parseInt(m) || 0))).padStart(2, '0')
+    handleField('exit_time', `${exitTimeHours || '00'}:${mm}`)
   }
 
   const cardStyle = {
@@ -702,7 +718,7 @@ export default function TradeForm() {
                   {sectionId === 'basic' && (
                     <div style={cardStyle}>
                       <h2 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', marginBottom: '16px' }}>{t.basicDetails}</h2>
-                      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '3fr 160px 2fr', gap: '14px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '3fr 160px 160px 2fr', gap: '14px' }}>
                         <div>
                           <label style={labelStyle}>{t.date}</label>
                           <DatePicker value={formData.date} onChange={val => handleField('date', val)} />
@@ -713,6 +729,14 @@ export default function TradeForm() {
                             <input type="number" min="0" max="23" value={parseInt(timeHours, 10)} onChange={e => setTimeHours(e.target.value)} style={{ ...inputStyle, width: '64px', textAlign: 'center', padding: '8px 6px' }} placeholder="HH" />
                             <span style={{ color: 'var(--text-muted)', fontWeight: 700, fontSize: '16px', flexShrink: 0 }}>:</span>
                             <input type="number" min="0" max="59" value={parseInt(timeMinutes, 10)} onChange={e => setTimeMinutes(e.target.value)} style={{ ...inputStyle, width: '64px', textAlign: 'center', padding: '8px 6px' }} placeholder="MM" />
+                          </div>
+                        </div>
+                        <div>
+                          <label style={labelStyle}>Exit Time</label>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <input type="number" min="0" max="23" value={exitTimeHours !== '' ? parseInt(exitTimeHours, 10) : ''} onChange={e => setExitTimeHours(e.target.value)} style={{ ...inputStyle, width: '64px', textAlign: 'center', padding: '8px 6px' }} placeholder="HH" />
+                            <span style={{ color: 'var(--text-muted)', fontWeight: 700, fontSize: '16px', flexShrink: 0 }}>:</span>
+                            <input type="number" min="0" max="59" value={exitTimeMinutes !== '' ? parseInt(exitTimeMinutes, 10) : ''} onChange={e => setExitTimeMinutes(e.target.value)} style={{ ...inputStyle, width: '64px', textAlign: 'center', padding: '8px 6px' }} placeholder="MM" />
                           </div>
                         </div>
                         <div>
