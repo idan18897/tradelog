@@ -1120,7 +1120,7 @@ export default function Journal() {
                       )}
 
                       <td style={{ padding: '10px 12px', fontSize: '13px', color: 'var(--text)' }}>
-                        {trade.rr_potential ? `1:${trade.rr_potential}` : '--'}
+                        {(() => { const v = trade.pot_rr || trade.rr_potential; return v ? `1:${v}` : '--' })()}
                       </td>
 
                       {(activeTab === 'live' || activeTab === 'combined') && (
@@ -1300,7 +1300,7 @@ export default function Journal() {
             <DetailField label="SL" value={selectedTrade.sl} />
             <DetailField label="TP" value={selectedTrade.tp} />
             <DetailField label={t.slPips} value={selectedTrade.sl_pips} />
-            <DetailField label={t.rrPotential || 'R:R Potential'} value={selectedTrade.rr_potential ? `1:${selectedTrade.rr_potential}` : '--'} />
+            <DetailField label={t.rrPotential || 'R:R Potential'} value={(() => { const v = selectedTrade.pot_rr || selectedTrade.rr_potential; return v ? `1:${v}` : '--' })()} />
             <DetailField label={t.risk} value={selectedTrade.risk_pct ? `${selectedTrade.risk_pct}%` : '--'} />
             {selectedTrade.trade_type === 'missed' && (() => {
               const fullRR = Number(selectedTrade.rr_potential) || Number(selectedTrade.pot_rr) || 0
