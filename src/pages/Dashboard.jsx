@@ -335,6 +335,12 @@ export default function Dashboard() {
       sub: 'currently active',
       color: 'var(--text)',
     },
+    {
+      label: 'Total Trades',
+      value: closedTrades.length.toString(),
+      sub: `${tpTrades.length} TP · ${slTrades.length} SL · ${beTrades.length} BE`,
+      color: 'var(--text)',
+    },
     ...(captureRate !== null ? [{
       label: 'Capture Rate',
       value: `${captureRate}%`,
