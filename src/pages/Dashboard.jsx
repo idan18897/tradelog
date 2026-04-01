@@ -8,26 +8,12 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { useLang } from '../context/LanguageContext'
 import DatePicker from '../components/DatePicker'
+import { computePnL } from '../lib/utils'
 
 function formatDate(iso) {
   if (!iso) return '--'
   const [y, m, d] = iso.split('-')
   return `${d}/${m}/${y}`
-}
-
-function computePnL(trade) {
-  const rr = Number(trade.rr_potential) || 0
-  const risk = Number(trade.risk_pct) || 0.5
-  if (trade.outcome === 'SL') return -risk
-  if (trade.outcome !== 'TP' && trade.outcome !== 'Partial TP') return 0
-  const isPartial = trade.outcome === 'Partial TP'
-  if (trade.sl_to_be && trade.exit_levels?.length) {
-    let rem = 100, gain = 0
-    for (const lv of trade.exit_levels) { gain += (lv.pct / 100) * lv.rr * risk; rem -= lv.pct }
-    if (!isPartial) gain += (rem / 100) * rr * risk
-    return gain
-  }
-  return isPartial ? rr * risk * 0.5 : rr * risk
 }
 
 function getOutcomeBadge(outcome) {
@@ -263,7 +249,7 @@ export default function Dashboard() {
   })
   const years = [...new Set(monthlyStats.map(m => m.year))].sort()
 
-  // Performance by Hour
+  // Performance by Hour (entry time)
   const hourMap = {}
   liveTrades.forEach(tr => {
     if (!tr.time) return
@@ -283,6 +269,18 @@ export default function Dashboard() {
       winRate: h.closed ? Math.round(h.tp / h.closed * 100) : null,
       pnl: parseFloat(h.trades.reduce((s, tr) => s + computePnL(tr), 0).toFixed(2)),
     }))
+
+  // Exit Hour distribution (trades that have exit_time filled)
+  const exitHourMap = {}
+  liveTrades.forEach(tr => {
+    if (!tr.exit_time) return
+    const hour = parseInt(tr.exit_time.split(':')[0], 10)
+    if (!exitHourMap[hour]) exitHourMap[hour] = { hour, total: 0 }
+    exitHourMap[hour].total++
+  })
+  const exitByHour = Object.values(exitHourMap)
+    .sort((a, b) => a.hour - b.hour)
+    .map(h => ({ ...h, label: `${String(h.hour).padStart(2, '0')}:00` }))
 
   // Equity curve — running cumulative P&L per closed trade
   const sortedForEquity = [...liveTrades]
@@ -986,7 +984,9 @@ export default function Dashboard() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
             <div>
               <h2 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', marginBottom: '4px' }}>Performance by Hour</h2>
-              <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{hourView === 'winRate' ? 'Which hour do you trade best?' : 'When are you most active?'}</p>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                {hourView === 'winRate' ? 'Which hour do you trade best?' : hourView === 'volume' ? 'When do you enter trades?' : 'When do you exit trades?'}
+              </p>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               {hourView === 'winRate' && (() => {
@@ -1003,14 +1003,24 @@ export default function Dashboard() {
                 const peak = [...perfByHour].sort((a, b) => b.total - a.total)[0]
                 return peak ? (
                   <div style={{ textAlign: 'end', marginRight: '8px' }}>
-                    <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>Peak Hour</p>
+                    <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>Peak Entry</p>
                     <p style={{ fontSize: '16px', fontWeight: 700, color: '#60a5fa' }}>{peak.label}</p>
                     <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{peak.total} trades</p>
                   </div>
                 ) : null
               })()}
+              {hourView === 'exit' && (() => {
+                const peak = [...exitByHour].sort((a, b) => b.total - a.total)[0]
+                return peak ? (
+                  <div style={{ textAlign: 'end', marginRight: '8px' }}>
+                    <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>Peak Exit</p>
+                    <p style={{ fontSize: '16px', fontWeight: 700, color: '#a78bfa' }}>{peak.label}</p>
+                    <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{peak.total} trades</p>
+                  </div>
+                ) : null
+              })()}
               <div style={{ display: 'flex', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '20px', padding: '3px', gap: '2px' }}>
-                {[{ key: 'winRate', label: 'Win Rate' }, { key: 'volume', label: 'Volume' }].map(opt => (
+                {[{ key: 'winRate', label: 'Win Rate' }, { key: 'volume', label: 'Entry' }, { key: 'exit', label: 'Exit' }].map(opt => (
                   <button
                     key={opt.key}
                     onClick={() => setHourView(opt.key)}
@@ -1028,7 +1038,10 @@ export default function Dashboard() {
             </div>
           </div>
           <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={perfByHour} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+            <BarChart
+              data={hourView === 'exit' ? exitByHour : perfByHour}
+              margin={{ top: 5, right: 10, left: -10, bottom: 5 }}
+            >
               <XAxis
                 dataKey="label"
                 tick={{ fill: 'var(--text-muted)', fontSize: 10 }}
@@ -1049,15 +1062,21 @@ export default function Dashboard() {
                   return (
                     <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px' }}>
                       <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text)', marginBottom: '6px' }}>{d.label}</p>
-                      <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{d.total} trades · {d.tp} TP · {d.sl} SL</p>
-                      {hourView === 'winRate' && (
-                        <p style={{ fontSize: '13px', fontWeight: 700, color: d.winRate >= 50 ? '#4ade80' : '#f87171', marginTop: '4px' }}>
-                          {d.winRate !== null ? `${d.winRate}% win rate` : '--'}
-                        </p>
+                      {hourView === 'exit' ? (
+                        <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{d.total} exits</p>
+                      ) : (
+                        <>
+                          <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{d.total} trades · {d.tp} TP · {d.sl} SL</p>
+                          {hourView === 'winRate' && (
+                            <p style={{ fontSize: '13px', fontWeight: 700, color: d.winRate >= 50 ? '#4ade80' : '#f87171', marginTop: '4px' }}>
+                              {d.winRate !== null ? `${d.winRate}% win rate` : '--'}
+                            </p>
+                          )}
+                          <p style={{ fontSize: '12px', color: d.pnl >= 0 ? '#4ade80' : '#f87171', marginTop: '2px' }}>
+                            {d.pnl >= 0 ? '+' : ''}{d.pnl}% P&L
+                          </p>
+                        </>
                       )}
-                      <p style={{ fontSize: '12px', color: d.pnl >= 0 ? '#4ade80' : '#f87171', marginTop: '2px' }}>
-                        {d.pnl >= 0 ? '+' : ''}{d.pnl}% P&L
-                      </p>
                     </div>
                   )
                 }}
@@ -1076,10 +1095,16 @@ export default function Dashboard() {
                     />
                   ))}
                 </Bar>
-              ) : (
+              ) : hourView === 'volume' ? (
                 <Bar dataKey="total" radius={[4, 4, 0, 0]} maxBarSize={40}>
                   {perfByHour.map((h, i) => (
                     <Cell key={i} fill="#60a5fa" opacity={0.7 + (h.total / Math.max(...perfByHour.map(x => x.total))) * 0.3} />
+                  ))}
+                </Bar>
+              ) : (
+                <Bar dataKey="total" radius={[4, 4, 0, 0]} maxBarSize={40}>
+                  {exitByHour.map((h, i) => (
+                    <Cell key={i} fill="#a78bfa" opacity={0.7 + (h.total / Math.max(...exitByHour.map(x => x.total), 1)) * 0.3} />
                   ))}
                 </Bar>
               )}

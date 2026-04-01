@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { useLang } from '../context/LanguageContext'
+import { computePnL, computeMissedPotGain } from '../lib/utils'
 
 const DEFAULT_PAIRS = ['XAUUSD', 'EURUSD', 'GBPUSD', 'USDJPY', 'GBPJPY', 'USDCHF', 'AUDUSD', 'NAS100', 'US30', 'USOIL']
 const OUTCOMES = ['TP', 'Partial TP', 'SL', 'BE', 'Invalid', 'Open']
@@ -186,20 +187,6 @@ function DetailField({ label, value, children }) {
 
 const CAL_DAY_HEADERS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
-function calPnL(tr) {
-  const rr = Number(tr.rr_potential) || 0
-  const risk = Number(tr.risk_pct) || 0.5
-  if (tr.outcome === 'SL') return -risk
-  if (tr.outcome !== 'TP' && tr.outcome !== 'Partial TP') return 0
-  const isPartial = tr.outcome === 'Partial TP'
-  if (tr.sl_to_be && tr.exit_levels?.length) {
-    let rem = 100, gain = 0
-    for (const lv of tr.exit_levels) { gain += (lv.pct / 100) * lv.rr * risk; rem -= lv.pct }
-    if (!isPartial) gain += (rem / 100) * rr * risk
-    return gain
-  }
-  return isPartial ? rr * risk * 0.5 : rr * risk
-}
 
 // secondaryTrades = missed trades shown in amber overlay (optional)
 function TradeCalendar({ trades, secondaryTrades, calMonth, onMonthChange, filterDay, onDayClick }) {
@@ -214,7 +201,7 @@ function TradeCalendar({ trades, secondaryTrades, calMonth, onMonthChange, filte
     if (!tr.date || tr.date.slice(0, 7) !== calMonth) return
     if (!dayStats[tr.date]) dayStats[tr.date] = { count: 0, pnl: 0 }
     dayStats[tr.date].count++
-    dayStats[tr.date].pnl += calPnL(tr)
+    dayStats[tr.date].pnl += computePnL(tr)
   })
 
   const missedStats = {}
@@ -223,20 +210,7 @@ function TradeCalendar({ trades, secondaryTrades, calMonth, onMonthChange, filte
       if (!tr.date || tr.date.slice(0, 7) !== calMonth) return
       if (!missedStats[tr.date]) missedStats[tr.date] = { count: 0, potPnL: 0 }
       missedStats[tr.date].count++
-const fullRR = Number(tr.rr_potential) || Number(tr.pot_rr) || 0
-      const risk = Number(tr.risk_pct) || 0.5
-      let potGain = 0
-      if (fullRR > 0) {
-        const isPartial = tr.outcome === 'Partial TP'
-        if (tr.sl_to_be && tr.exit_levels?.length) {
-          let rem = 100
-          for (const lv of tr.exit_levels) { potGain += (lv.pct / 100) * lv.rr * risk; rem -= lv.pct }
-          if (!isPartial) potGain += (rem / 100) * fullRR * risk
-        } else {
-          potGain = isPartial ? fullRR * risk * 0.5 : fullRR * risk
-        }
-      }
-      missedStats[tr.date].potPnL += potGain
+      missedStats[tr.date].potPnL += computeMissedPotGain(tr)
     })
   }
 
@@ -537,11 +511,12 @@ export default function Journal() {
 
   async function deleteTrade(id) {
     if (!window.confirm(t.deleteConfirm)) return
+    // Optimistic: remove immediately
+    setTrades(prev => prev.filter(tr => tr.id !== id))
+    if (selectedTrade?.id === id) setSelectedTrade(null)
     const { error } = await supabase.from('trades').delete().eq('id', id)
-    if (!error) {
-      if (selectedTrade?.id === id) setSelectedTrade(null)
-      fetchTrades()
-    }
+    // Rollback on error
+    if (error) fetchTrades()
   }
 
   // All live trades (existing behavior)
@@ -555,7 +530,6 @@ export default function Journal() {
   )
 
   // Comparison stats — filtered to calMonth for Combined tab
-  const computePnL = t => calPnL(t)
   const inCalMonth = t => t.date?.slice(0, 7) === calMonth
   const mLiveTrades = liveTrades.filter(inCalMonth)
   const mLiveTPTrades = mLiveTrades.filter(t => t.outcome === 'TP' || t.outcome === 'Partial TP')
@@ -572,19 +546,6 @@ export default function Journal() {
   const captureRate = mBacktestTrades.length ? Math.round(mLiveTPTrades.length / mBacktestTrades.length * 100) : 0
   const missedCount = mMissedTrades.length
 
-  const computeMissedPotGain = tr => {
-    const fullRR = Number(tr.rr_potential) || Number(tr.pot_rr) || 0
-    const risk = Number(tr.risk_pct) || 0.5
-    if (!fullRR) return 0
-    const isPartial = tr.outcome === 'Partial TP'
-    if (tr.sl_to_be && tr.exit_levels?.length) {
-      let rem = 100, gain = 0
-      for (const lv of tr.exit_levels) { gain += (lv.pct / 100) * lv.rr * risk; rem -= lv.pct }
-      if (!isPartial) gain += (rem / 100) * fullRR * risk
-      return gain
-    }
-    return isPartial ? fullRR * risk * 0.5 : fullRR * risk
-  }
   const takenAvgRR = mLiveTPTrades.length ? (mLiveTPTrades.reduce((s, t) => s + (t.rr_potential || 0), 0) / mLiveTPTrades.length).toFixed(1) : '0'
   const takenTotalPnL = mLiveTPTrades.reduce((s, t) => s + computePnL(t), 0)
   const missedAvgRR = mMissedTrades.length ? (mMissedTrades.reduce((s, t) => s + (Number(t.rr_potential) || Number(t.pot_rr) || 0), 0) / mMissedTrades.length).toFixed(1) : '0'
@@ -1303,18 +1264,8 @@ export default function Journal() {
             <DetailField label={t.rrPotential || 'R:R Potential'} value={(() => { const v = selectedTrade.pot_rr || selectedTrade.rr_potential; return v ? `1:${v}` : '--' })()} />
             <DetailField label={t.risk} value={selectedTrade.risk_pct ? `${selectedTrade.risk_pct}%` : '--'} />
             {selectedTrade.trade_type === 'missed' && (() => {
-              const fullRR = Number(selectedTrade.rr_potential) || Number(selectedTrade.pot_rr) || 0
-              const risk = Number(selectedTrade.risk_pct) || 0.5
-              if (!fullRR) return null
-              const isPartial = selectedTrade.outcome === 'Partial TP'
-              let gain = 0
-              if (selectedTrade.sl_to_be && selectedTrade.exit_levels?.length) {
-                let rem = 100
-                for (const lv of selectedTrade.exit_levels) { gain += (lv.pct / 100) * lv.rr * risk; rem -= lv.pct }
-                if (!isPartial) gain += (rem / 100) * fullRR * risk
-              } else {
-                gain = isPartial ? fullRR * risk * 0.5 : fullRR * risk
-              }
+              const gain = computeMissedPotGain(selectedTrade)
+              if (!gain) return null
               return (
                 <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '10px', marginTop: '4px' }}>
                   <span style={{ fontSize: '12px', color: '#f59e0b' }}>Potential Gain if entered:</span>
