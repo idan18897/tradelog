@@ -309,7 +309,7 @@ export default function Dashboard() {
   const profitFactor = grossLoss > 0 ? parseFloat((grossProfit / grossLoss).toFixed(2)) : null
 
   // ── Confirmation Analysis ──
-  const confTrades = allLiveTrades.filter(tr =>
+  const confTrades = liveTrades.filter(tr =>
     ['TP', 'Partial TP', 'SL', 'BE'].includes(tr.outcome) &&
     Array.isArray(tr.confirmations) && tr.confirmations.length > 0
   )
