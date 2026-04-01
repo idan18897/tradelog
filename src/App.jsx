@@ -9,6 +9,7 @@ import Dashboard from './pages/Dashboard'
 import Journal from './pages/Journal'
 import TradeForm from './pages/TradeForm'
 import Settings from './pages/Settings'
+import Landing from './pages/Landing'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -24,6 +25,7 @@ function ProtectedRoute({ children }) {
 function AppRoutes() {
   return (
     <Routes>
+      <Route path="/landing" element={<Landing />} />
       <Route path="/login" element={<Login />} />
       <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<Dashboard />} />
