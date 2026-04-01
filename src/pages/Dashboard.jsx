@@ -53,6 +53,7 @@ export default function Dashboard() {
   const [showMissed, setShowMissed] = useState(false)
   const [customOpen, setCustomOpen] = useState(false)
   const [hourView, setHourView] = useState('winRate') // 'winRate' | 'volume'
+  const [dashTab, setDashTab] = useState('overview') // 'overview' | 'confirmations'
   const customRef = useRef(null)
 
   useEffect(() => {
@@ -307,6 +308,48 @@ export default function Dashboard() {
   const grossLoss = slTrades.reduce((s, tr) => s + Math.abs(computePnL(tr)), 0)
   const profitFactor = grossLoss > 0 ? parseFloat((grossProfit / grossLoss).toFixed(2)) : null
 
+  // ── Confirmation Analysis ──
+  const confTrades = allLiveTrades.filter(tr =>
+    ['TP', 'Partial TP', 'SL', 'BE'].includes(tr.outcome) &&
+    Array.isArray(tr.confirmations) && tr.confirmations.length > 0
+  )
+  const confMap = {}
+  confTrades.forEach(tr => {
+    const pnl = computePnL(tr)
+    const isWin = tr.outcome === 'TP' || tr.outcome === 'Partial TP'
+    tr.confirmations.forEach(c => {
+      if (!confMap[c]) confMap[c] = { name: c, trades: 0, wins: 0, pnl: 0, rrSum: 0, rrCount: 0 }
+      confMap[c].trades++
+      if (isWin) { confMap[c].wins++; if (tr.rr_potential) { confMap[c].rrSum += tr.rr_potential; confMap[c].rrCount++ } }
+      confMap[c].pnl += pnl
+    })
+  })
+  const confStats = Object.values(confMap)
+    .map(c => ({ ...c, winRate: Math.round(c.wins / c.trades * 100), avgRR: c.rrCount ? parseFloat((c.rrSum / c.rrCount).toFixed(2)) : 0, pnl: parseFloat(c.pnl.toFixed(2)) }))
+    .sort((a, b) => b.pnl - a.pnl)
+
+  // Combinations (2-conf pairs)
+  const comboMap = {}
+  confTrades.forEach(tr => {
+    const confs = [...tr.confirmations].sort()
+    const pnl = computePnL(tr)
+    const isWin = tr.outcome === 'TP' || tr.outcome === 'Partial TP'
+    for (let i = 0; i < confs.length; i++) {
+      for (let j = i + 1; j < confs.length; j++) {
+        const key = `${confs[i]} + ${confs[j]}`
+        if (!comboMap[key]) comboMap[key] = { combo: key, trades: 0, wins: 0, pnl: 0 }
+        comboMap[key].trades++
+        if (isWin) comboMap[key].wins++
+        comboMap[key].pnl += pnl
+      }
+    }
+  })
+  const comboStats = Object.values(comboMap)
+    .filter(c => c.trades >= 2)
+    .map(c => ({ ...c, winRate: Math.round(c.wins / c.trades * 100), pnl: parseFloat(c.pnl.toFixed(2)) }))
+    .sort((a, b) => b.pnl - a.pnl)
+    .slice(0, 15)
+
   const statCards = [
     {
       label: t.winRate,
@@ -512,6 +555,139 @@ export default function Dashboard() {
           </span>
         </div>
       </div>
+
+      {/* Tab bar */}
+      <div style={{ display: 'flex', gap: '0', borderBottom: '1px solid var(--border)', marginBottom: '24px' }}>
+        {[{ key: 'overview', label: 'Overview' }, { key: 'confirmations', label: '🔍 Confirmation Analysis' }].map(tab => (
+          <button key={tab.key} onClick={() => setDashTab(tab.key)} style={{
+            padding: '10px 20px', fontSize: '13.5px', fontWeight: dashTab === tab.key ? 600 : 400,
+            background: 'none', border: 'none', cursor: 'pointer',
+            color: dashTab === tab.key ? 'var(--text)' : 'var(--text-muted)',
+            borderBottom: `2px solid ${dashTab === tab.key ? 'var(--text)' : 'transparent'}`,
+            transition: 'all 0.15s',
+          }}>{tab.label}</button>
+        ))}
+      </div>
+
+      {/* ── Confirmation Analysis Tab ── */}
+      {dashTab === 'confirmations' && (
+        <div>
+          {confStats.length === 0 ? (
+            <div style={{ ...cardStyle, padding: '40px', textAlign: 'center' }}>
+              <p style={{ fontSize: '14px', color: 'var(--text-muted)' }}>No confirmation data yet — add confirmations to your trades to see analysis.</p>
+            </div>
+          ) : (
+            <>
+              {/* Bar chart — top confirmations by P&L */}
+              <div style={{ ...cardStyle, padding: '20px', marginBottom: '20px' }}>
+                <h2 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', marginBottom: '4px' }}>Confirmations by P&L</h2>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px' }}>Which confirmations generate the most profit</p>
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart data={confStats.slice(0, 12)} margin={{ top: 5, right: 10, left: -10, bottom: 40 }}>
+                    <XAxis dataKey="name" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} axisLine={false} tickLine={false} angle={-35} textAnchor="end" interval={0} />
+                    <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `${v > 0 ? '+' : ''}${v}%`} />
+                    <Tooltip content={({ active, payload }) => {
+                      if (!active || !payload?.length) return null
+                      const d = payload[0].payload
+                      return (
+                        <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px' }}>
+                          <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', marginBottom: '6px' }}>{d.name}</p>
+                          <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{d.trades} trades · {d.winRate}% win rate</p>
+                          <p style={{ fontSize: '13px', fontWeight: 700, color: d.pnl >= 0 ? '#4ade80' : '#f87171', marginTop: '4px' }}>{d.pnl >= 0 ? '+' : ''}{d.pnl}% P&L</p>
+                          <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Avg R:R 1:{d.avgRR}</p>
+                        </div>
+                      )
+                    }} cursor={{ fill: 'rgba(128,128,128,0.06)' }} />
+                    <Bar dataKey="pnl" radius={[4, 4, 0, 0]} maxBarSize={48}>
+                      {confStats.slice(0, 12).map((c, i) => (
+                        <Cell key={i} fill={c.pnl >= 0 ? '#4ade80' : '#f87171'} opacity={0.85} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Stats table */}
+              <div style={{ ...cardStyle, marginBottom: '20px', overflow: 'hidden' }}>
+                <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--border)' }}>
+                  <h2 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)' }}>Confirmation Breakdown</h2>
+                </div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                        {['Confirmation', 'Trades', 'Win Rate', 'Avg R:R', 'Total P&L'].map(h => (
+                          <th key={h} style={{ padding: '10px 16px', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textAlign: h === 'Confirmation' ? 'left' : 'right', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {confStats.map((c, i) => (
+                        <tr key={c.name} style={{ borderBottom: '1px solid var(--border)', background: i % 2 === 0 ? 'transparent' : 'rgba(128,128,128,0.03)' }}>
+                          <td style={{ padding: '12px 16px', fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>{c.name}</td>
+                          <td style={{ padding: '12px 16px', fontSize: '13px', color: 'var(--text-muted)', textAlign: 'right' }}>{c.trades}</td>
+                          <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                            <span style={{ fontSize: '13px', fontWeight: 600, color: c.winRate >= 60 ? '#4ade80' : c.winRate >= 45 ? '#f59e0b' : '#f87171' }}>{c.winRate}%</span>
+                          </td>
+                          <td style={{ padding: '12px 16px', fontSize: '13px', color: 'var(--text)', textAlign: 'right' }}>1:{c.avgRR || '--'}</td>
+                          <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                            <span style={{ fontSize: '13px', fontWeight: 700, color: c.pnl >= 0 ? '#4ade80' : '#f87171' }}>{c.pnl >= 0 ? '+' : ''}{c.pnl}%</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Combinations table */}
+              {comboStats.length > 0 && (
+                <div style={{ ...cardStyle, overflow: 'hidden' }}>
+                  <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--border)' }}>
+                    <h2 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', marginBottom: '2px' }}>Best Combinations</h2>
+                    <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Pairs of confirmations that appear together (min. 2 trades)</p>
+                  </div>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                          {['Combination', 'Trades', 'Win Rate', 'Total P&L'].map(h => (
+                            <th key={h} style={{ padding: '10px 16px', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textAlign: h === 'Combination' ? 'left' : 'right', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {comboStats.map((c, i) => (
+                          <tr key={c.combo} style={{ borderBottom: '1px solid var(--border)', background: i % 2 === 0 ? 'transparent' : 'rgba(128,128,128,0.03)' }}>
+                            <td style={{ padding: '12px 16px', fontSize: '13px', fontWeight: 500, color: 'var(--text)' }}>
+                              {c.combo.split(' + ').map((tag, idx) => (
+                                <span key={idx}>
+                                  <span style={{ background: 'rgba(96,165,250,0.12)', color: '#60a5fa', borderRadius: '6px', padding: '2px 8px', fontSize: '12px', fontWeight: 600 }}>{tag}</span>
+                                  {idx < c.combo.split(' + ').length - 1 && <span style={{ color: 'var(--text-muted)', margin: '0 4px' }}>+</span>}
+                                </span>
+                              ))}
+                            </td>
+                            <td style={{ padding: '12px 16px', fontSize: '13px', color: 'var(--text-muted)', textAlign: 'right' }}>{c.trades}</td>
+                            <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                              <span style={{ fontSize: '13px', fontWeight: 600, color: c.winRate >= 60 ? '#4ade80' : c.winRate >= 45 ? '#f59e0b' : '#f87171' }}>{c.winRate}%</span>
+                            </td>
+                            <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                              <span style={{ fontSize: '13px', fontWeight: 700, color: c.pnl >= 0 ? '#4ade80' : '#f87171' }}>{c.pnl >= 0 ? '+' : ''}{c.pnl}%</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── Overview Tab ── */}
+      {dashTab === 'overview' && <>
 
       {/* Stats cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px', marginBottom: '20px' }}
@@ -1258,6 +1434,7 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+      </> }
     </div>
   )
 }
