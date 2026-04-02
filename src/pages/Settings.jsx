@@ -106,6 +106,7 @@ export default function Settings() {
 
   // Default risk
   const [defaultRisk, setDefaultRisk] = useState('0.5')
+  const [defaultOutcome, setDefaultOutcome] = useState('Open')
 
   // Direction colors
   const [longColor, setLongColor] = useState('#4ade80')
@@ -239,6 +240,7 @@ export default function Settings() {
     if (data) {
       setPairs(data.pairs?.length ? data.pairs : DEFAULT_PAIRS)
       setDefaultRisk(data.default_risk_pct?.toString() || '0.5')
+      if (data.default_outcome) setDefaultOutcome(data.default_outcome)
       if (data.long_color) setLongColor(data.long_color)
       if (data.short_color) setShortColor(data.short_color)
       if (data.exit_modes?.length) setExitModes(data.exit_modes)
@@ -275,6 +277,7 @@ export default function Settings() {
       user_id: user.id,
       pairs,
       default_risk_pct: parseFloat(defaultRisk) || 0.5,
+      default_outcome: defaultOutcome,
       long_color: longColor,
       short_color: shortColor,
       exit_modes: exitModes,
@@ -418,10 +421,21 @@ export default function Settings() {
                 <div style={cardStyle}>
                   <p style={sectionTitle}>Default Risk %</p>
                   <p style={sectionSub}>Auto-loaded in every new trade</p>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '20px' }}>
                     <input type="number" step="0.1" min="0.1" max="100" value={defaultRisk} onChange={e => { setDefaultRisk(e.target.value); setIsDirty(true) }} style={{ ...inputStyle, maxWidth: '120px' }} />
                     <span style={{ color: 'var(--text-muted)', fontSize: '14px' }}>%</span>
                   </div>
+                  <p style={sectionTitle}>Default Outcome</p>
+                  <p style={sectionSub}>Pre-selected outcome in every new trade</p>
+                  <select
+                    value={defaultOutcome}
+                    onChange={e => { setDefaultOutcome(e.target.value); setIsDirty(true) }}
+                    style={{ ...inputStyle, maxWidth: '200px' }}
+                  >
+                    {['TP', 'Partial TP', 'SL', 'BE', 'Invalid', 'Open'].map(o => (
+                      <option key={o} value={o}>{o}</option>
+                    ))}
+                  </select>
                 </div>
               </SortableSection>
             )

@@ -421,6 +421,9 @@ export default function TradeForm() {
       if (!isEditing && data.default_risk_pct) {
         setFormData(prev => ({ ...prev, risk_pct: data.default_risk_pct.toString() }))
       }
+      if (!isEditing && data.default_outcome) {
+        setFormData(prev => ({ ...prev, outcome: data.default_outcome }))
+      }
       if (data.exit_modes?.length) setExitModes(data.exit_modes)
       if (data.form_section_order?.length) {
         setSectionOrder(data.form_section_order)

@@ -470,6 +470,9 @@ export default function Journal() {
   const [filterPair, setFilterPair] = useState('All')
   const [filterOutcome, setFilterOutcome] = useState('All')
   const [filterDirection, setFilterDirection] = useState('All')
+  const [filterRating, setFilterRating] = useState(0)
+  const [sortKey, setSortKey] = useState('date')
+  const [sortDir, setSortDir] = useState('desc')
   const [selectedTrade, setSelectedTrade] = useState(null)
   const [activeTab, setActiveTab] = useState(() => localStorage.getItem('journal_tab') || 'live')
   const [lightbox, setLightbox] = useState(null) // { src, label }
@@ -580,14 +583,70 @@ export default function Journal() {
 
   // Apply filters to the active tab
   const activeList = activeTab === 'live' ? liveTrades : activeTab === 'backtest' ? backtestTrades : combinedTrades
-  const filtered = activeList.filter(tr => {
+  const SORT_KEYS = {
+    date: tr => tr.date + 'T' + (tr.time || '00:00'),
+    'Entry Time': tr => tr.time || '',
+    Pair: tr => tr.pair || '',
+    Direction: tr => tr.direction || '',
+    Entry: tr => Number(tr.entry) || 0,
+    'SL Pips': tr => Number(tr.sl_pips) || 0,
+    'Pot. R:R': tr => Number(tr.pot_rr || tr.rr_potential) || 0,
+    'Risk%': tr => Number(tr.risk_pct) || 0,
+    Outcome: tr => tr.outcome || '',
+    Rating: tr => Number(tr.rating) || 0,
+    'P&L': tr => computePnL(tr),
+  }
+
+  const filteredRaw = activeList.filter(tr => {
     if (filterDay && tr.date !== filterDay) return false
     else if (!filterDay && filterMonth !== 'All' && tr.date?.slice(0, 7) !== filterMonth) return false
     if (filterPair !== 'All' && tr.pair !== filterPair) return false
     if (filterOutcome !== 'All' && tr.outcome !== filterOutcome) return false
     if (filterDirection !== 'All' && tr.direction !== filterDirection) return false
+    if (filterRating > 0 && (tr.rating || 0) < filterRating) return false
     return true
   })
+
+  const sortFn = SORT_KEYS[sortKey] || SORT_KEYS['date']
+  const filtered = [...filteredRaw].sort((a, b) => {
+    const va = sortFn(a), vb = sortFn(b)
+    if (va < vb) return sortDir === 'asc' ? -1 : 1
+    if (va > vb) return sortDir === 'asc' ? 1 : -1
+    return 0
+  })
+
+  function handleSort(key) {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortKey(key); setSortDir('asc') }
+  }
+
+  function exportCSV() {
+    const cols = ['Date', 'Entry Time', 'Pair', 'Direction', 'Entry', 'SL', 'TP', 'SL Pips', 'Pot R:R', 'Risk%', 'Outcome', 'P&L', 'Rating', 'Notes']
+    const rows = filtered.map(tr => [
+      tr.date || '',
+      tr.time || '',
+      tr.pair || '',
+      tr.direction || '',
+      tr.entry || '',
+      tr.sl || '',
+      tr.tp || '',
+      tr.sl_pips || '',
+      tr.pot_rr || tr.rr_potential || '',
+      tr.risk_pct || '',
+      tr.outcome || '',
+      computePnL(tr).toFixed(2),
+      tr.rating || '',
+      `"${(tr.notes || '').replace(/"/g, '""')}"`,
+    ])
+    const csv = [cols.join(','), ...rows.map(r => r.join(','))].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `trades_${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   function handleDayClick(dateStr) {
     if (filterDay === dateStr) {
@@ -662,6 +721,17 @@ export default function Journal() {
         ))}
         {/* New Trade button - pushed to end */}
         <div style={{ flex: 1 }} />
+        <button
+          onClick={exportCSV}
+          style={{
+            fontSize: '13px', padding: '8px 14px', borderRadius: '10px',
+            fontWeight: 600, cursor: 'pointer', border: '1px solid var(--border-strong)',
+            background: 'transparent', color: 'var(--text-muted)', alignSelf: 'center',
+            marginBottom: '8px', letterSpacing: '-0.01em', whiteSpace: 'nowrap',
+          }}
+        >
+          ↓ Export CSV
+        </button>
         <Link
           to="/new"
           style={{
@@ -998,7 +1068,37 @@ export default function Journal() {
           <option value="Long">Long</option>
           <option value="Short">Short</option>
         </select>
+        <select value={filterRating} onChange={e => setFilterRating(Number(e.target.value))} style={{ width: 'auto' }}>
+          <option value={0}>All Ratings</option>
+          <option value={1}>⭐ +</option>
+          <option value={2}>⭐⭐ +</option>
+          <option value={3}>⭐⭐⭐ +</option>
+          <option value={4}>⭐⭐⭐⭐ +</option>
+          <option value={5}>⭐⭐⭐⭐⭐</option>
+        </select>
       </div>
+
+      {/* Quick Stats */}
+      {filtered.length > 0 && (() => {
+        const qClosed = filtered.filter(tr => ['TP','Partial TP','SL','BE'].includes(tr.outcome))
+        const qTP = filtered.filter(tr => tr.outcome === 'TP' || tr.outcome === 'Partial TP')
+        const qWinRate = qClosed.length ? Math.round(qTP.length / qClosed.length * 100) : null
+        const qPnL = filtered.reduce((s, tr) => s + computePnL(tr), 0)
+        const qAvgRR = qTP.length ? (qTP.reduce((s, tr) => s + (tr.rr_potential || 0), 0) / qTP.length).toFixed(1) : null
+        return (
+          <div style={{
+            display: 'flex', gap: '20px', flexWrap: 'wrap',
+            padding: '10px 16px', marginBottom: '10px',
+            background: 'var(--bg-secondary)', borderRadius: '12px',
+            fontSize: '12px', color: 'var(--text-muted)',
+          }}>
+            <span><strong style={{ color: 'var(--text)' }}>{filtered.length}</strong> trades</span>
+            {qWinRate !== null && <span>Win Rate <strong style={{ color: qWinRate >= 50 ? '#30D158' : '#FF453A' }}>{qWinRate}%</strong></span>}
+            <span>P&L <strong style={{ color: qPnL >= 0 ? '#30D158' : '#FF453A' }}>{qPnL >= 0 ? '+' : ''}{qPnL.toFixed(2)}%</strong></span>
+            {qAvgRR && <span>Avg R:R <strong style={{ color: 'var(--accent)' }}>1:{qAvgRR}</strong></span>}
+          </div>
+        )
+      })()}
 
       {/* Table */}
       <div style={{ ...cardStyle, overflow: 'hidden', marginBottom: '16px' }}>
@@ -1011,20 +1111,28 @@ export default function Journal() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                  {headers.map(h => (
-                    <th key={h} style={{
-                      padding: '10px 12px',
-                      textAlign: 'start',
-                      fontSize: '11px',
-                      fontWeight: 600,
-                      color: 'var(--text-muted)',
-                      whiteSpace: 'nowrap',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',
-                    }}>
-                      {h}
-                    </th>
-                  ))}
+                  {headers.map(h => {
+                    const sortable = h in SORT_KEYS || h === 'date'
+                    const key = h === t.date ? 'date' : h
+                    const isActive = sortKey === key
+                    return (
+                      <th
+                        key={h}
+                        onClick={sortable ? () => handleSort(key) : undefined}
+                        style={{
+                          padding: '10px 12px', textAlign: 'start',
+                          fontSize: '11px', fontWeight: 600,
+                          color: isActive ? 'var(--accent)' : 'var(--text-muted)',
+                          whiteSpace: 'nowrap', textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                          cursor: sortable ? 'pointer' : 'default',
+                          userSelect: 'none',
+                        }}
+                      >
+                        {h}{isActive ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}
+                      </th>
+                    )
+                  })}
                 </tr>
               </thead>
               <tbody>
