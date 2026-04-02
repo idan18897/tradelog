@@ -734,7 +734,7 @@ export default function Dashboard() {
             <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
               <div style={{ textAlign: 'center' }}>
                 <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>Total</p>
-                <p style={{ fontSize: '20px', fontWeight: 700, color: equityPositive ? '#4ade80' : '#f87171' }}>
+                <p style={{ fontSize: '20px', fontWeight: 700, color: equityPositive ? '#0A84FF' : '#f87171' }}>
                   {equityFinal >= 0 ? '+' : ''}{equityFinal.toFixed(2)}%
                 </p>
               </div>
@@ -777,7 +777,7 @@ export default function Dashboard() {
                     <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px' }}>
                       <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>{d.label}</p>
                       {d.pair && <p style={{ fontSize: '12px', color: 'var(--text)', marginBottom: '2px' }}>{d.pair} · {d.outcome}</p>}
-                      <p style={{ fontSize: '15px', fontWeight: 700, color: d.value >= 0 ? '#4ade80' : '#f87171' }}>
+                      <p style={{ fontSize: '15px', fontWeight: 700, color: d.value >= 0 ? '#0A84FF' : '#f87171' }}>
                         {d.value >= 0 ? '+' : ''}{d.value}%
                       </p>
                     </div>
@@ -826,7 +826,7 @@ export default function Dashboard() {
               <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(128,128,128,0.06)' }} />
               <Bar dataKey="pnl" radius={[4, 4, 0, 0]}>
                 {chartData.map((entry, i) => (
-                  <Cell key={i} fill={entry.pnl >= 0 ? '#0A84FF' : '#FF453A'} />
+                  <Cell key={i} fill={entry.pnl >= 0 ? '#0A84FF' : '#FF453A'} opacity={0.9} />
                 ))}
               </Bar>
             </BarChart>
@@ -989,7 +989,7 @@ export default function Dashboard() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {perfByDay.map(day => {
               const barColor = day.winRate === null ? '#6b7280'
-                : day.winRate >= 60 ? '#4ade80'
+                : day.winRate >= 60 ? '#0A84FF'
                 : day.winRate >= 40 ? '#f59e0b'
                 : '#f87171'
               return (
@@ -1035,7 +1035,7 @@ export default function Dashboard() {
             })}
           </div>
           <div style={{ display: 'flex', gap: '16px', marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--border)' }}>
-            {[{ label: '≥60% Win Rate', color: '#4ade80' }, { label: '40–59%', color: '#f59e0b' }, { label: '<40%', color: '#f87171' }].map(l => (
+            {[{ label: '≥60% Win Rate', color: '#0A84FF' }, { label: '40–59%', color: '#f59e0b' }, { label: '<40%', color: '#f87171' }].map(l => (
               <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <div style={{ width: '10px', height: '10px', borderRadius: '2px', background: l.color, opacity: 0.8 }} />
                 <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{l.label}</span>
@@ -1099,7 +1099,7 @@ export default function Dashboard() {
                         )
                         const intensity = Math.min(Math.abs(stat.pnl) / 5, 1) // max opacity at 5%
                         const bg = stat.pnl > 0
-                          ? `rgba(74,222,128,${0.1 + intensity * 0.5})`
+                          ? `rgba(10,132,255,${0.1 + intensity * 0.5})`
                           : stat.pnl < 0
                           ? `rgba(248,113,113,${0.1 + intensity * 0.5})`
                           : 'var(--bg)'
@@ -1119,7 +1119,7 @@ export default function Dashboard() {
                                 gap: '1px',
                               }}
                             >
-                              <span style={{ fontSize: '11px', fontWeight: 700, color: stat.pnl >= 0 ? '#4ade80' : '#f87171', lineHeight: 1 }}>
+                              <span style={{ fontSize: '11px', fontWeight: 700, color: stat.pnl >= 0 ? '#0A84FF' : '#f87171', lineHeight: 1 }}>
                                 {stat.pnl >= 0 ? '+' : ''}{stat.pnl.toFixed(1)}%
                               </span>
                               <span style={{ fontSize: '10px', color: 'var(--text-muted)', lineHeight: 1 }}>{stat.total} ✦</span>
@@ -1131,13 +1131,13 @@ export default function Dashboard() {
                         <div style={{
                           height: '44px',
                           borderRadius: '6px',
-                          background: yearTotal >= 0 ? 'rgba(74,222,128,0.15)' : 'rgba(248,113,113,0.15)',
+                          background: yearTotal >= 0 ? 'rgba(10,132,255,0.15)' : 'rgba(248,113,113,0.15)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           minWidth: '52px',
                         }}>
-                          <span style={{ fontSize: '12px', fontWeight: 700, color: yearTotal >= 0 ? '#4ade80' : '#f87171' }}>
+                          <span style={{ fontSize: '12px', fontWeight: 700, color: yearTotal >= 0 ? '#0A84FF' : '#f87171' }}>
                             {yearTotal >= 0 ? '+' : ''}{yearTotal.toFixed(1)}%
                           </span>
                         </div>
@@ -1244,11 +1244,11 @@ export default function Dashboard() {
                         <>
                           <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{d.total} trades · {d.tp} TP · {d.sl} SL</p>
                           {hourView === 'winRate' && (
-                            <p style={{ fontSize: '13px', fontWeight: 700, color: d.winRate >= 50 ? '#4ade80' : '#f87171', marginTop: '4px' }}>
+                            <p style={{ fontSize: '13px', fontWeight: 700, color: d.winRate >= 50 ? '#0A84FF' : '#f87171', marginTop: '4px' }}>
                               {d.winRate !== null ? `${d.winRate}% win rate` : '--'}
                             </p>
                           )}
-                          <p style={{ fontSize: '12px', color: d.pnl >= 0 ? '#4ade80' : '#f87171', marginTop: '2px' }}>
+                          <p style={{ fontSize: '12px', color: d.pnl >= 0 ? '#30D158' : '#f87171', marginTop: '2px' }}>
                             {d.pnl >= 0 ? '+' : ''}{d.pnl}% P&L
                           </p>
                         </>

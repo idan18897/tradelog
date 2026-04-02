@@ -301,7 +301,7 @@ function TradeCalendar({ trades, secondaryTrades, calMonth, onMonthChange, filte
       {/* Legend */}
       <div style={{ display: 'flex', gap: '16px', marginBottom: '10px', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: 'var(--text-muted)' }}>
-          <span style={{ width: '10px', height: '10px', borderRadius: '3px', background: 'rgba(74,222,128,0.4)', display: 'inline-block', border: '1px solid rgba(74,222,128,0.5)' }} />
+          <span style={{ width: '10px', height: '10px', borderRadius: '3px', background: 'rgba(48,209,88,0.4)', display: 'inline-block', border: '1px solid rgba(48,209,88,0.5)' }} />
           Win
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: 'var(--text-muted)' }}>
