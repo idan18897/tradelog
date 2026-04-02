@@ -18,7 +18,7 @@ function formatDate(iso) {
 
 function getOutcomeBadge(outcome) {
   const map = {
-    TP: { bg: 'rgba(74,222,128,0.15)', color: '#4ade80' },
+    TP: { bg: 'rgba(48,209,88,0.15)', color: '#30D158' },
     'Partial TP': { bg: 'rgba(163,230,53,0.15)', color: '#a3e635' },
     SL: { bg: 'rgba(248,113,113,0.15)', color: '#f87171' },
     BE: { bg: 'rgba(250,204,21,0.15)', color: '#facc15' },
@@ -272,11 +272,11 @@ function TradeCalendar({ trades, secondaryTrades, calMonth, onMonthChange, filte
             </div>
             <div style={{ textAlign: 'center' }}>
               <p style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '1px' }}>Win Days</p>
-              <p style={{ fontSize: '14px', fontWeight: 700, color: '#4ade80' }}>{winDays}/{tradingDays}</p>
+              <p style={{ fontSize: '14px', fontWeight: 700, color: '#30D158' }}>{winDays}/{tradingDays}</p>
             </div>
             <div style={{ textAlign: 'center' }}>
-              <p style={{ fontSize: '10px', color: '#4ade80', marginBottom: '1px' }}>Winning Trades</p>
-              <p style={{ fontSize: '14px', fontWeight: 700, color: '#4ade80' }}>{winCount}</p>
+              <p style={{ fontSize: '10px', color: '#30D158', marginBottom: '1px' }}>Winning Trades</p>
+              <p style={{ fontSize: '14px', fontWeight: 700, color: '#30D158' }}>{winCount}</p>
             </div>
             <div style={{ textAlign: 'center' }}>
               <p style={{ fontSize: '10px', color: '#f87171', marginBottom: '1px' }}>Losing Trades</p>
@@ -284,15 +284,15 @@ function TradeCalendar({ trades, secondaryTrades, calMonth, onMonthChange, filte
             </div>
             <div style={{ textAlign: 'center' }}>
               <p style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '1px' }}>Month P&L</p>
-              <p style={{ fontSize: '14px', fontWeight: 700, color: monthPnL >= 0 ? '#4ade80' : '#f87171' }}>
+              <p style={{ fontSize: '14px', fontWeight: 700, color: monthPnL >= 0 ? '#30D158' : '#f87171' }}>
                 {monthPnL >= 0 ? '+' : ''}{monthPnL.toFixed(2)}%
               </p>
             </div>
           </>}
           {secondaryTrades && missedDaysCount > 0 && (
             <div style={{ textAlign: 'center' }}>
-              <p style={{ fontSize: '10px', color: '#f59e0b', marginBottom: '1px' }}>Missed Days</p>
-              <p style={{ fontSize: '14px', fontWeight: 700, color: '#f59e0b' }}>{missedDaysCount}</p>
+              <p style={{ fontSize: '10px', color: '#FF9F0A', marginBottom: '1px' }}>Missed Days</p>
+              <p style={{ fontSize: '14px', fontWeight: 700, color: '#FF9F0A' }}>{missedDaysCount}</p>
             </div>
           )}
         </div>
@@ -357,14 +357,14 @@ function TradeCalendar({ trades, secondaryTrades, calMonth, onMonthChange, filte
                 let bg = 'transparent'
                 let borderCol = 'var(--border)'
                 if (hasTrades && hasMissed) {
-                  bg = pnl >= 0 ? 'rgba(74,222,128,0.18)' : 'rgba(248,113,113,0.18)'
-                  borderCol = isSelected ? 'var(--accent)' : 'rgba(245,158,11,0.6)'
+                  bg = pnl >= 0 ? 'rgba(48,209,88,0.18)' : 'rgba(255,69,58,0.18)'
+                  borderCol = isSelected ? 'var(--accent)' : 'rgba(255,159,10,0.6)'
                 } else if (hasTrades) {
-                  bg = pnl >= 0 ? 'rgba(74,222,128,0.18)' : 'rgba(248,113,113,0.18)'
-                  borderCol = isSelected ? 'var(--accent)' : pnl >= 0 ? 'rgba(74,222,128,0.35)' : 'rgba(248,113,113,0.35)'
+                  bg = pnl >= 0 ? 'rgba(48,209,88,0.18)' : 'rgba(255,69,58,0.18)'
+                  borderCol = isSelected ? 'var(--accent)' : pnl >= 0 ? 'rgba(48,209,88,0.35)' : 'rgba(255,69,58,0.35)'
                 } else if (hasMissed) {
-                  bg = 'rgba(245,158,11,0.12)'
-                  borderCol = isSelected ? 'var(--accent)' : 'rgba(245,158,11,0.35)'
+                  bg = 'rgba(255,159,10,0.12)'
+                  borderCol = isSelected ? 'var(--accent)' : 'rgba(255,159,10,0.35)'
                 }
 
                 return (
@@ -391,7 +391,7 @@ function TradeCalendar({ trades, secondaryTrades, calMonth, onMonthChange, filte
                           </span>
                         )}
                         {hasMissed && (
-                          <span style={{ fontSize: '10px', color: '#f59e0b', lineHeight: 1.2 }}>
+                          <span style={{ fontSize: '10px', color: '#FF9F0A', lineHeight: 1.2 }}>
                             {missed.count} missed
                           </span>
                         )}
@@ -401,17 +401,17 @@ function TradeCalendar({ trades, secondaryTrades, calMonth, onMonthChange, filte
                       </span>
                     </div>
                     {hasTrades && (
-                      <div style={{ marginTop: '8px', fontSize: '13px', fontWeight: 700, color: pnl >= 0 ? '#4ade80' : '#f87171' }}>
+                      <div style={{ marginTop: '8px', fontSize: '13px', fontWeight: 700, color: pnl >= 0 ? '#30D158' : '#FF453A' }}>
                         {pnl >= 0 ? '+' : ''}{pnl.toFixed(2)}%
                       </div>
                     )}
                     {!hasTrades && hasMissed && missed.potPnL > 0 && (
-                      <div style={{ marginTop: '8px', fontSize: '13px', fontWeight: 700, color: '#f59e0b' }}>
+                      <div style={{ marginTop: '8px', fontSize: '13px', fontWeight: 700, color: '#FF9F0A' }}>
                         +{missed.potPnL.toFixed(2)}%
                       </div>
                     )}
                     {hasTrades && hasMissed && missed.potPnL > 0 && (
-                      <div style={{ fontSize: '11px', fontWeight: 600, color: '#f59e0b', marginTop: '2px' }}>
+                      <div style={{ fontSize: '11px', fontWeight: 600, color: '#FF9F0A', marginTop: '2px' }}>
                         +{missed.potPnL.toFixed(2)}%
                       </div>
                     )}
@@ -424,10 +424,10 @@ function TradeCalendar({ trades, secondaryTrades, calMonth, onMonthChange, filte
                 minHeight: '72px',
                 borderRadius: '8px',
                 border: (weekHasTrades || weekMissedPnL > 0)
-                  ? `1px solid ${weekHasTrades ? (weekPnL >= 0 ? 'rgba(74,222,128,0.35)' : 'rgba(248,113,113,0.35)') : 'rgba(245,158,11,0.35)'}`
+                  ? `1px solid ${weekHasTrades ? (weekPnL >= 0 ? 'rgba(48,209,88,0.35)' : 'rgba(255,69,58,0.35)') : 'rgba(255,159,10,0.35)'}`
                   : '1px solid transparent',
                 background: (weekHasTrades || weekMissedPnL > 0)
-                  ? weekHasTrades ? (weekPnL >= 0 ? 'rgba(74,222,128,0.18)' : 'rgba(248,113,113,0.18)') : 'rgba(245,158,11,0.12)'
+                  ? weekHasTrades ? (weekPnL >= 0 ? 'rgba(48,209,88,0.18)' : 'rgba(255,69,58,0.18)') : 'rgba(255,159,10,0.12)'
                   : 'transparent',
                 display: 'flex',
                 flexDirection: 'column',
@@ -440,12 +440,12 @@ function TradeCalendar({ trades, secondaryTrades, calMonth, onMonthChange, filte
                   <>
                     <span style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Weekly</span>
                     {weekHasTrades && (
-                      <span style={{ fontSize: '13px', fontWeight: 700, color: weekPnL >= 0 ? '#4ade80' : '#f87171', textAlign: 'center' }}>
+                      <span style={{ fontSize: '13px', fontWeight: 700, color: weekPnL >= 0 ? '#30D158' : '#f87171', textAlign: 'center' }}>
                         {weekPnL >= 0 ? '+' : ''}{weekPnL.toFixed(2)}%
                       </span>
                     )}
                     {weekMissedPnL > 0 && (
-                      <span style={{ fontSize: '11px', fontWeight: 700, color: '#f59e0b', textAlign: 'center' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 700, color: '#FF9F0A', textAlign: 'center' }}>
                         +{weekMissedPnL.toFixed(2)}%
                       </span>
                     )}
@@ -713,13 +713,13 @@ export default function Journal() {
               </div>
               <div>
                 <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>Total P&L</p>
-                <p style={{ fontSize: '20px', fontWeight: 700, color: liveTotalPnL >= 0 ? '#4ade80' : '#f87171' }}>
+                <p style={{ fontSize: '20px', fontWeight: 700, color: liveTotalPnL >= 0 ? '#30D158' : '#f87171' }}>
                   {liveTotalPnL >= 0 ? '+' : ''}{liveTotalPnL.toFixed(1)}%
                 </p>
               </div>
               <div>
                 <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>TP</p>
-                <p style={{ fontSize: '20px', fontWeight: 700, color: '#4ade80' }}>{liveTPTrades.length}</p>
+                <p style={{ fontSize: '20px', fontWeight: 700, color: '#30D158' }}>{liveTPTrades.length}</p>
               </div>
             </div>
           </div>
@@ -727,20 +727,20 @@ export default function Journal() {
           {/* BackTesting card */}
           <div style={{
             background: 'var(--card)',
-            border: '2px solid #f59e0b',
+            border: '2px solid #FF9F0A',
             borderRadius: '18px',
             padding: '18px',
             boxShadow: 'var(--shadow)',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b', display: 'inline-block' }} />
-              <span style={{ fontSize: '13px', fontWeight: 700, color: '#f59e0b' }}>Opportunity Log</span>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#FF9F0A', display: 'inline-block' }} />
+              <span style={{ fontSize: '13px', fontWeight: 700, color: '#FF9F0A' }}>Opportunity Log</span>
               <span style={{ fontSize: '12px', color: 'var(--text-muted)', marginRight: 'auto' }}>{backtestTrades.length} opportunities</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div>
                 <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>Capture Rate</p>
-                <p style={{ fontSize: '20px', fontWeight: 700, color: captureRate >= 70 ? '#4ade80' : captureRate >= 50 ? '#f59e0b' : '#f87171' }}>
+                <p style={{ fontSize: '20px', fontWeight: 700, color: captureRate >= 70 ? '#30D158' : captureRate >= 50 ? '#FF9F0A' : '#f87171' }}>
                   {captureRate}%
                 </p>
               </div>
@@ -750,7 +750,7 @@ export default function Journal() {
               </div>
               <div>
                 <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>Potential P&L</p>
-                <p style={{ fontSize: '20px', fontWeight: 700, color: '#4ade80' }}>+{btTotalPnL.toFixed(1)}%</p>
+                <p style={{ fontSize: '20px', fontWeight: 700, color: '#30D158' }}>+{btTotalPnL.toFixed(1)}%</p>
               </div>
               <div>
                 <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>Missed</p>
@@ -770,7 +770,7 @@ export default function Journal() {
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
               <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>Capture Rate — how many opportunities you actually took</span>
-              <span style={{ fontSize: '13px', fontWeight: 700, color: captureRate >= 70 ? '#4ade80' : captureRate >= 50 ? '#f59e0b' : '#f87171' }}>
+              <span style={{ fontSize: '13px', fontWeight: 700, color: captureRate >= 70 ? '#30D158' : captureRate >= 50 ? '#FF9F0A' : '#f87171' }}>
                 {liveTPTrades.length} / {backtestTrades.length}
               </span>
             </div>
@@ -779,7 +779,7 @@ export default function Journal() {
                 height: '100%',
                 width: `${captureRate}%`,
                 borderRadius: '5px',
-                background: captureRate >= 70 ? '#4ade80' : captureRate >= 50 ? '#f59e0b' : '#f87171',
+                background: captureRate >= 70 ? '#30D158' : captureRate >= 50 ? '#FF9F0A' : '#f87171',
                 transition: 'width 0.5s ease',
               }} />
             </div>
@@ -805,13 +805,13 @@ export default function Journal() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div>
                 <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>Total P&L</p>
-                <p style={{ fontSize: '20px', fontWeight: 700, color: liveTotalPnL >= 0 ? '#4ade80' : '#f87171' }}>
+                <p style={{ fontSize: '20px', fontWeight: 700, color: liveTotalPnL >= 0 ? '#30D158' : '#f87171' }}>
                   {liveTotalPnL >= 0 ? '+' : ''}{liveTotalPnL.toFixed(2)}%
                 </p>
               </div>
               <div>
                 <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>Win Rate</p>
-                <p style={{ fontSize: '20px', fontWeight: 700, color: liveWinRate >= 60 ? '#4ade80' : liveWinRate >= 45 ? '#f59e0b' : '#f87171' }}>
+                <p style={{ fontSize: '20px', fontWeight: 700, color: liveWinRate >= 60 ? '#30D158' : liveWinRate >= 45 ? '#FF9F0A' : '#f87171' }}>
                   {liveWinRate}%
                 </p>
               </div>
@@ -821,7 +821,7 @@ export default function Journal() {
               </div>
               <div>
                 <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>Profit Factor</p>
-                <p style={{ fontSize: '20px', fontWeight: 700, color: liveProfitFactor === '--' ? 'var(--text-muted)' : parseFloat(liveProfitFactor) >= 1.5 ? '#4ade80' : parseFloat(liveProfitFactor) >= 1 ? '#f59e0b' : '#f87171' }}>
+                <p style={{ fontSize: '20px', fontWeight: 700, color: liveProfitFactor === '--' ? 'var(--text-muted)' : parseFloat(liveProfitFactor) >= 1.5 ? '#30D158' : parseFloat(liveProfitFactor) >= 1 ? '#FF9F0A' : '#f87171' }}>
                   {liveProfitFactor}
                 </p>
               </div>
@@ -837,7 +837,7 @@ export default function Journal() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div>
                 <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>Avg Win</p>
-                <p style={{ fontSize: '20px', fontWeight: 700, color: '#4ade80' }}>+{liveAvgWin}%</p>
+                <p style={{ fontSize: '20px', fontWeight: 700, color: '#30D158' }}>+{liveAvgWin}%</p>
               </div>
               <div>
                 <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>Avg Loss</p>
@@ -845,7 +845,7 @@ export default function Journal() {
               </div>
               <div>
                 <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>Best Trade</p>
-                <p style={{ fontSize: '20px', fontWeight: 700, color: '#4ade80' }}>
+                <p style={{ fontSize: '20px', fontWeight: 700, color: '#30D158' }}>
                   {liveBestTrade !== null ? `+${liveBestTrade.toFixed(2)}%` : '--'}
                 </p>
               </div>
@@ -853,7 +853,7 @@ export default function Journal() {
                 <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>
                   {streakType ? `${streak} ${streakType === 'W' ? 'Win' : 'Loss'} Streak` : 'Streak'}
                 </p>
-                <p style={{ fontSize: '20px', fontWeight: 700, color: streakType === 'W' ? '#4ade80' : streakType === 'L' ? '#f87171' : 'var(--text-muted)' }}>
+                <p style={{ fontSize: '20px', fontWeight: 700, color: streakType === 'W' ? '#30D158' : streakType === 'L' ? '#f87171' : 'var(--text-muted)' }}>
                   {streak > 0 ? `${streakType === 'W' ? '🔥' : ''}${streak}×` : '--'}
                 </p>
               </div>
@@ -888,7 +888,7 @@ export default function Journal() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div>
                 <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>Total P&L</p>
-                <p style={{ fontSize: '20px', fontWeight: 700, color: takenTotalPnL >= 0 ? '#4ade80' : '#f87171' }}>
+                <p style={{ fontSize: '20px', fontWeight: 700, color: takenTotalPnL >= 0 ? '#30D158' : '#f87171' }}>
                   {takenTotalPnL >= 0 ? '+' : ''}{takenTotalPnL.toFixed(1)}%
                 </p>
               </div>
@@ -898,25 +898,25 @@ export default function Journal() {
               </div>
               <div>
                 <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>Capture Rate</p>
-                <p style={{ fontSize: '20px', fontWeight: 700, color: captureRate >= 70 ? '#4ade80' : captureRate >= 50 ? '#f59e0b' : '#f87171' }}>{captureRate}%</p>
+                <p style={{ fontSize: '20px', fontWeight: 700, color: captureRate >= 70 ? '#30D158' : captureRate >= 50 ? '#FF9F0A' : '#f87171' }}>{captureRate}%</p>
               </div>
               <div>
                 <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>TP Count</p>
-                <p style={{ fontSize: '20px', fontWeight: 700, color: '#4ade80' }}>{mLiveTPTrades.length}</p>
+                <p style={{ fontSize: '20px', fontWeight: 700, color: '#30D158' }}>{mLiveTPTrades.length}</p>
               </div>
             </div>
           </div>
           {/* Trades Missed */}
-          <div style={{ background: 'var(--card)', border: '2px solid #f59e0b', borderRadius: '18px', padding: '18px', boxShadow: 'var(--shadow)' }}>
+          <div style={{ background: 'var(--card)', border: '2px solid #FF9F0A', borderRadius: '18px', padding: '18px', boxShadow: 'var(--shadow)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b', display: 'inline-block' }} />
-              <span style={{ fontSize: '13px', fontWeight: 700, color: '#f59e0b' }}>Trades Missed</span>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#FF9F0A', display: 'inline-block' }} />
+              <span style={{ fontSize: '13px', fontWeight: 700, color: '#FF9F0A' }}>Trades Missed</span>
               <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{mMissedTrades.length} trades</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div>
                 <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>Potential P&L</p>
-                <p style={{ fontSize: '20px', fontWeight: 700, color: '#f59e0b' }}>+{missedTotalPotPnL.toFixed(1)}%</p>
+                <p style={{ fontSize: '20px', fontWeight: 700, color: '#FF9F0A' }}>+{missedTotalPotPnL.toFixed(1)}%</p>
               </div>
               <div>
                 <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>Avg R:R</p>
@@ -928,7 +928,7 @@ export default function Journal() {
               </div>
               <div>
                 <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>Missed Days</p>
-                <p style={{ fontSize: '20px', fontWeight: 700, color: '#f59e0b' }}>
+                <p style={{ fontSize: '20px', fontWeight: 700, color: '#FF9F0A' }}>
                   {new Set(mMissedTrades.map(t => t.date)).size}
                 </p>
               </div>
@@ -1056,7 +1056,7 @@ export default function Journal() {
                             borderRadius: '4px',
                             fontWeight: 600,
                             background: (trade.trade_type === 'missed') ? 'rgba(245,158,11,0.15)' : 'var(--accent-light)',
-                            color: (trade.trade_type === 'missed') ? '#f59e0b' : 'var(--accent)',
+                            color: (trade.trade_type === 'missed') ? '#FF9F0A' : 'var(--accent)',
                           }}>
                             {trade.trade_type === 'missed' ? 'Missed' : 'Live ✓'}
                           </span>
@@ -1210,7 +1210,7 @@ export default function Journal() {
                   padding: '2px 8px',
                   borderRadius: '5px',
                   background: 'rgba(245,158,11,0.15)',
-                  color: '#f59e0b',
+                  color: '#FF9F0A',
                   fontWeight: 500,
                 }}>
                   Missed
@@ -1270,8 +1270,8 @@ export default function Journal() {
               if (!gain) return null
               return (
                 <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '10px', marginTop: '4px' }}>
-                  <span style={{ fontSize: '12px', color: '#f59e0b' }}>Potential Gain if entered:</span>
-                  <span style={{ fontSize: '18px', fontWeight: 700, color: '#f59e0b' }}>+{gain.toFixed(2)}%</span>
+                  <span style={{ fontSize: '12px', color: '#FF9F0A' }}>Potential Gain if entered:</span>
+                  <span style={{ fontSize: '18px', fontWeight: 700, color: '#FF9F0A' }}>+{gain.toFixed(2)}%</span>
                 </div>
               )
             })()}
@@ -1329,7 +1329,7 @@ export default function Journal() {
           {selectedTrade.missed_reason && (
             <div style={{ marginBottom: '14px' }}>
               <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '5px' }}>Why missed?</p>
-              <p style={{ fontSize: '13px', color: '#f59e0b' }}>{selectedTrade.missed_reason}</p>
+              <p style={{ fontSize: '13px', color: '#FF9F0A' }}>{selectedTrade.missed_reason}</p>
             </div>
           )}
 

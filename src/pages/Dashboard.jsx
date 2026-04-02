@@ -826,7 +826,7 @@ export default function Dashboard() {
               <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(128,128,128,0.06)' }} />
               <Bar dataKey="pnl" radius={[4, 4, 0, 0]}>
                 {chartData.map((entry, i) => (
-                  <Cell key={i} fill={entry.pnl >= 0 ? '#30D158' : '#FF453A'} />
+                  <Cell key={i} fill={entry.pnl >= 0 ? '#0A84FF' : '#FF453A'} />
                 ))}
               </Bar>
             </BarChart>
@@ -1264,7 +1264,7 @@ export default function Dashboard() {
                     <Cell
                       key={i}
                       fill={h.winRate === null ? '#6b7280'
-                        : h.winRate >= 60 ? '#4ade80'
+                        : h.winRate >= 60 ? '#0A84FF'
                         : h.winRate >= 40 ? '#f59e0b'
                         : '#f87171'}
                       opacity={0.85}
