@@ -562,8 +562,8 @@ export default function Dashboard() {
           <button key={tab.key} onClick={() => setDashTab(tab.key)} style={{
             padding: '10px 20px', fontSize: '13.5px', fontWeight: dashTab === tab.key ? 600 : 400,
             background: 'none', border: 'none', cursor: 'pointer',
-            color: dashTab === tab.key ? 'var(--text)' : 'var(--text-muted)',
-            borderBottom: `2px solid ${dashTab === tab.key ? 'var(--text)' : 'transparent'}`,
+            color: dashTab === tab.key ? 'var(--accent)' : 'var(--text-muted)',
+            borderBottom: `2px solid ${dashTab === tab.key ? 'var(--accent)' : 'transparent'}`,
             transition: 'all 0.15s',
           }}>{tab.label}</button>
         ))}
@@ -740,7 +740,7 @@ export default function Dashboard() {
               </div>
               <div style={{ textAlign: 'center' }}>
                 <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>Peak</p>
-                <p style={{ fontSize: '14px', fontWeight: 600, color: '#4ade80' }}>+{equityMax.toFixed(2)}%</p>
+                <p style={{ fontSize: '14px', fontWeight: 600, color: '#30D158' }}>+{equityMax.toFixed(2)}%</p>
               </div>
               <div style={{ textAlign: 'center' }}>
                 <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>Low</p>
@@ -752,8 +752,8 @@ export default function Dashboard() {
             <AreaChart data={equityData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
               <defs>
                 <linearGradient id="equityGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={equityPositive ? '#34d399' : '#f87171'} stopOpacity={0.3} />
-                  <stop offset="95%" stopColor={equityPositive ? '#34d399' : '#f87171'} stopOpacity={0} />
+                  <stop offset="5%" stopColor={equityPositive ? '#0A84FF' : '#f87171'} stopOpacity={0.3} />
+                  <stop offset="95%" stopColor={equityPositive ? '#0A84FF' : '#f87171'} stopOpacity={0} />
                 </linearGradient>
               </defs>
               <XAxis
@@ -788,11 +788,11 @@ export default function Dashboard() {
               <Area
                 type="monotone"
                 dataKey="value"
-                stroke={equityPositive ? '#34d399' : '#f87171'}
+                stroke={equityPositive ? '#0A84FF' : '#f87171'}
                 strokeWidth={2}
                 fill="url(#equityGrad)"
                 dot={false}
-                activeDot={{ r: 4, fill: equityPositive ? '#34d399' : '#f87171', stroke: 'var(--card)', strokeWidth: 2 }}
+                activeDot={{ r: 4, fill: equityPositive ? '#0A84FF' : '#f87171', stroke: 'var(--card)', strokeWidth: 2 }}
               />
             </AreaChart>
           </ResponsiveContainer>
@@ -826,7 +826,7 @@ export default function Dashboard() {
               <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(128,128,128,0.06)' }} />
               <Bar dataKey="pnl" radius={[4, 4, 0, 0]}>
                 {chartData.map((entry, i) => (
-                  <Cell key={i} fill={entry.pnl >= 0 ? '#1D9E75' : '#ef4444'} />
+                  <Cell key={i} fill={entry.pnl >= 0 ? '#30D158' : '#FF453A'} />
                 ))}
               </Bar>
             </BarChart>

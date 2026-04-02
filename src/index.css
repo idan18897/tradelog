@@ -1,42 +1,43 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /* ─────────────────────────────────────────
-   LIGHT THEME — Warm Apple
+   LIGHT THEME — Apple
 ───────────────────────────────────────── */
 :root {
   /* Backgrounds */
-  --bg:               #F5F0E8;
-  --bg-secondary:     #EDE8DF;
+  --bg:               #F2F2F7;
+  --bg-secondary:     #E5E5EA;
 
   /* Cards */
   --card:             #FFFFFF;
   --card-hover:       #F9F9F9;
 
   /* Borders */
-  --border:           rgba(0, 0, 0, 0.07);
-  --border-strong:    rgba(0, 0, 0, 0.13);
+  --border:           rgba(0,0,0,0.07);
+  --border-strong:    rgba(0,0,0,0.13);
 
   /* Typography */
   --text:             #1C1C1E;
   --text-muted:       #6C6C70;
   --text-subtle:      #AEAEB2;
 
-  /* Accent — Emerald */
-  --accent:           #1D9E75;
-  --accent-hover:     #178a65;
-  --accent-light:     rgba(29, 158, 117, 0.09);
-  --accent-light-hover: rgba(29, 158, 117, 0.16);
+  /* Accent — Apple Blue */
+  --accent:           #007AFF;
+  --accent-hover:     #0066CC;
+  --accent-light:     rgba(0,122,255,0.09);
+  --accent-light-hover: rgba(0,122,255,0.16);
 
-  /* Shadows — very soft */
+  /* Shadows */
   --shadow:           0 1px 2px rgba(0,0,0,0.04), 0 2px 8px rgba(0,0,0,0.06);
-  --shadow-md:        0 4px 16px rgba(0,0,0,0.07), 0 2px 6px rgba(0,0,0,0.04);
-  --shadow-lg:        0 8px 32px rgba(0,0,0,0.09), 0 2px 8px rgba(0,0,0,0.05);
+  --shadow-md:        0 4px 16px rgba(0,0,0,0.08);
+  --shadow-lg:        0 8px 32px rgba(0,0,0,0.10);
 
   /* Radius */
-  --radius-sm:        8px;
-  --radius:           12px;
+  --radius-sm:        10px;
+  --radius:           14px;
   --radius-lg:        18px;
   --radius-xl:        22px;
 
@@ -49,51 +50,51 @@
   --sidebar-border:   rgba(0,0,0,0.07);
 
   /* Inputs */
-  --input-bg:         #F7F5F1;
+  --input-bg:         #F2F2F7;
   --input-border:     rgba(0,0,0,0.10);
-  --input-focus:      #1D9E75;
+  --input-focus:      #007AFF;
 
-  /* Primary Button — black in light mode */
-  --btn-primary-bg:   #1C1C1E;
+  /* Primary Button */
+  --btn-primary-bg:   #007AFF;
   --btn-primary-color: #FFFFFF;
-  --btn-primary-hover: #2C2C2E;
+  --btn-primary-hover: #0066CC;
 }
 
 /* ─────────────────────────────────────────
-   DARK THEME — Apple Space Gray
+   DARK THEME — Apple Black
 ───────────────────────────────────────── */
 [data-theme="dark"] {
   /* Backgrounds */
-  --bg:               #1C1C1E;
-  --bg-secondary:     #161618;
+  --bg:               #000000;
+  --bg-secondary:     #111111;
 
   /* Cards */
-  --card:             #2C2C2E;
-  --card-hover:       #3A3A3C;
+  --card:             #1C1C1E;
+  --card-hover:       #2C2C2E;
 
   /* Borders */
-  --border:           #38383A;
-  --border-strong:    #48484A;
+  --border:           rgba(255,255,255,0.08);
+  --border-strong:    rgba(255,255,255,0.14);
 
   /* Typography */
-  --text:             #F5F5F7;
+  --text:             #FFFFFF;
   --text-muted:       #8E8E93;
-  --text-subtle:      #636366;
+  --text-subtle:      #48484A;
 
-  /* Accent — Apple System Green */
-  --accent:           #34C759;
-  --accent-hover:     #2DB14E;
-  --accent-light:     rgba(52, 199, 89, 0.12);
-  --accent-light-hover: rgba(52, 199, 89, 0.20);
+  /* Accent — Apple Blue */
+  --accent:           #0A84FF;
+  --accent-hover:     #0070E0;
+  --accent-light:     rgba(10,132,255,0.12);
+  --accent-light-hover: rgba(10,132,255,0.20);
 
   /* Shadows */
-  --shadow:           0 1px 0 rgba(255,255,255,0.04), 0 2px 8px rgba(0,0,0,0.45);
-  --shadow-md:        0 4px 20px rgba(0,0,0,0.60);
-  --shadow-lg:        0 8px 40px rgba(0,0,0,0.75);
+  --shadow:           0 1px 0 rgba(255,255,255,0.04), 0 2px 12px rgba(0,0,0,0.6);
+  --shadow-md:        0 4px 24px rgba(0,0,0,0.7);
+  --shadow-lg:        0 8px 48px rgba(0,0,0,0.85);
 
-  /* Radius — same */
-  --radius-sm:        8px;
-  --radius:           12px;
+  /* Radius */
+  --radius-sm:        10px;
+  --radius:           14px;
   --radius-lg:        18px;
   --radius-xl:        22px;
 
@@ -102,18 +103,18 @@
   --logo-invert:      1;
 
   /* Navigation */
-  --sidebar-bg:       #2C2C2E;
-  --sidebar-border:   #38383A;
+  --sidebar-bg:       #111111;
+  --sidebar-border:   rgba(255,255,255,0.06);
 
   /* Inputs */
   --input-bg:         #1C1C1E;
-  --input-border:     #38383A;
-  --input-focus:      #34C759;
+  --input-border:     rgba(255,255,255,0.10);
+  --input-focus:      #0A84FF;
 
-  /* Primary Button — white in dark mode */
-  --btn-primary-bg:   #F5F5F7;
-  --btn-primary-color: #1C1C1E;
-  --btn-primary-hover: #E5E5EA;
+  /* Primary Button */
+  --btn-primary-bg:   #0A84FF;
+  --btn-primary-color: #FFFFFF;
+  --btn-primary-hover: #0070E0;
 }
 
 /* ─────────────────────────────────────────
@@ -163,7 +164,7 @@ input, select, textarea {
 
 input:focus, select:focus, textarea:focus {
   border-color: var(--input-focus) !important;
-  box-shadow: 0 0 0 3px var(--accent-light);
+  box-shadow: 0 0 0 3px rgba(10,132,255,0.2);
 }
 
 input[type="date"]::-webkit-calendar-picker-indicator,

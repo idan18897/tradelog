@@ -111,8 +111,8 @@ export default function Sidebar() {
     display: 'flex',
     alignItems: 'center',
     gap: '10px',
-    padding: '9px 12px',
-    borderRadius: '8px',
+    padding: '10px 14px',
+    borderRadius: '10px',
     fontSize: '14px',
     fontWeight: 500,
     cursor: 'pointer',
@@ -164,7 +164,7 @@ export default function Sidebar() {
         </div>
 
         {/* Nav */}
-        <nav style={{ flex: 1, padding: '12px 10px' }}>
+        <nav style={{ flex: 1, padding: '16px 12px' }}>
           {navItems.map(({ to, labelKey, icon: Icon, end }) => (
             <NavLink
               key={to}

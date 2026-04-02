@@ -81,7 +81,7 @@ function MiniStars({ value }) {
             {(full || half) && (
               <polygon
                 points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"
-                fill="#facc15" stroke="#facc15" strokeWidth="1.5"
+                fill="#FFD60A" stroke="#FFD60A" strokeWidth="1.5"
                 strokeLinecap="round" strokeLinejoin="round"
                 clipPath={half ? `url(#msc-${n}-${value})` : undefined}
               />
@@ -648,10 +648,10 @@ export default function Journal() {
               fontSize: '13.5px',
               fontWeight: activeTab === tab.key ? 600 : 400,
               letterSpacing: '-0.01em',
-              color: activeTab === tab.key ? 'var(--text)' : 'var(--text-muted)',
+              color: activeTab === tab.key ? 'var(--accent)' : 'var(--text-muted)',
               background: 'none',
               border: 'none',
-              borderBottom: `2px solid ${activeTab === tab.key ? 'var(--text)' : 'transparent'}`,
+              borderBottom: `2px solid ${activeTab === tab.key ? 'var(--accent)' : 'transparent'}`,
               cursor: 'pointer',
               transition: 'color 0.15s',
               marginBottom: '-1px',
@@ -1016,9 +1016,11 @@ export default function Journal() {
                       padding: '10px 12px',
                       textAlign: 'start',
                       fontSize: '11px',
-                      fontWeight: 500,
+                      fontWeight: 600,
                       color: 'var(--text-muted)',
                       whiteSpace: 'nowrap',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
                     }}>
                       {h}
                     </th>
@@ -1053,8 +1055,8 @@ export default function Journal() {
                             padding: '2px 7px',
                             borderRadius: '4px',
                             fontWeight: 600,
-                            background: (trade.trade_type === 'missed') ? 'rgba(245,158,11,0.15)' : 'rgba(52,211,153,0.15)',
-                            color: (trade.trade_type === 'missed') ? '#f59e0b' : '#34d399',
+                            background: (trade.trade_type === 'missed') ? 'rgba(245,158,11,0.15)' : 'var(--accent-light)',
+                            color: (trade.trade_type === 'missed') ? '#f59e0b' : 'var(--accent)',
                           }}>
                             {trade.trade_type === 'missed' ? 'Missed' : 'Live ✓'}
                           </span>

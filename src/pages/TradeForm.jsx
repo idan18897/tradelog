@@ -100,7 +100,7 @@ function StarRating({ value, onChange, readonly = false, size = 30 }) {
                 </defs>
                 <polygon
                   points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"
-                  fill="#facc15" stroke="#facc15" strokeWidth="1.5"
+                  fill="#FFD60A" stroke="#FFD60A" strokeWidth="1.5"
                   strokeLinecap="round" strokeLinejoin="round"
                   clipPath={`url(#sc-${n})`}
                 />
@@ -237,16 +237,16 @@ function ScreenshotSlot({ label, preview, isActive, onActivate, onFile, onRemove
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           style={{
-            border: `2px dashed ${borderColor}`,
-            borderRadius: '12px',
+            border: `2px dashed ${isActive ? 'var(--accent)' : 'var(--border-strong)'}`,
+            borderRadius: '14px',
             padding: '28px 16px',
+            background: isActive ? 'var(--accent-light)' : 'var(--bg-secondary)',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             gap: '8px',
             cursor: 'pointer',
             transition: 'border-color 0.15s, background 0.15s',
-            background: bgColor,
           }}
         >
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={isActive ? 'var(--accent)' : 'var(--text-muted)'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -824,7 +824,7 @@ export default function TradeForm() {
                         {confirmationsList.map(conf => {
                           const isSelected = formData.confirmations.includes(conf.label)
                           return (
-                            <button key={conf.id} type="button" onClick={() => toggleConfirmation(conf.label)} style={{ padding: '6px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 500, cursor: 'pointer', transition: 'all 0.15s', background: isSelected ? 'var(--accent-light)' : 'var(--bg)', border: `1px solid ${isSelected ? 'var(--accent)' : 'var(--border)'}`, color: isSelected ? 'var(--accent)' : 'var(--text-muted)' }}>
+                            <button key={conf.id} type="button" onClick={() => toggleConfirmation(conf.label)} style={{ padding: '6px 14px', borderRadius: '20px', fontSize: '13px', fontWeight: 500, cursor: 'pointer', transition: 'all 0.15s', background: isSelected ? 'var(--accent)' : 'transparent', border: isSelected ? 'none' : '1px solid var(--border-strong)', color: isSelected ? '#fff' : 'var(--text-muted)' }}>
                               {conf.label}
                             </button>
                           )
@@ -963,14 +963,14 @@ export default function TradeForm() {
             disabled={loading}
             style={{
               flex: 1,
-              padding: '12px',
-              borderRadius: '12px',
-              fontSize: '14px',
-              fontWeight: 600,
+              padding: '14px',
+              borderRadius: '14px',
+              fontSize: '15px',
+              fontWeight: 700,
               border: 'none',
               cursor: loading ? 'not-allowed' : 'pointer',
-              background: 'var(--btn-primary-bg)',
-              color: 'var(--btn-primary-color)',
+              background: 'var(--accent)',
+              color: '#fff',
               opacity: loading ? 0.7 : 1,
               transition: 'opacity 0.15s',
             }}
