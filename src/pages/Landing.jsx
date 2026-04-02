@@ -327,6 +327,7 @@ export default function Landing() {
                 background: plan.highlight ? 'rgba(29,158,117,0.08)' : 'rgba(255,255,255,0.03)',
                 border: `1px solid ${plan.highlight ? 'rgba(29,158,117,0.4)' : 'rgba(255,255,255,0.07)'}`,
                 borderRadius: '20px', padding: '32px', transition: 'all 0.2s', position: 'relative', overflow: 'hidden',
+                display: 'flex', flexDirection: 'column',
               }}>
                 {(plan.highlight || plan.badge) && (
                   <div style={{ position: 'absolute', top: '16px', right: '16px', background: '#1D9E75', color: '#fff', fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '50px', letterSpacing: '0.04em' }}>{plan.badge || 'POPULAR'}</div>
@@ -337,7 +338,7 @@ export default function Landing() {
                   <span style={{ fontSize: '14px', color: '#8e8e93' }}>{plan.period}</span>
                 </div>
                 <div style={{ height: '1px', background: 'rgba(255,255,255,0.07)', margin: '20px 0' }} />
-                <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 28px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 28px', display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
                   {plan.features.map(f => (
                     <li key={f} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', color: '#d1d1d6' }}>
                       <span style={{ color: '#1D9E75', fontWeight: 700, flexShrink: 0 }}>✓</span>
@@ -346,7 +347,7 @@ export default function Landing() {
                   ))}
                 </ul>
                 <button onClick={() => handleCheckout(plan.name.toLowerCase())} disabled={checkoutLoading === plan.name.toLowerCase()} style={{
-                  ...s.btn, width: '100%', boxSizing: 'border-box',
+                  ...s.btn, width: '100%', boxSizing: 'border-box', marginTop: 'auto',
                   background: plan.highlight ? '#1D9E75' : 'rgba(255,255,255,0.07)',
                   color: plan.highlight ? '#fff' : '#f5f5f7',
                   border: plan.highlight ? 'none' : '1px solid rgba(255,255,255,0.1)',
