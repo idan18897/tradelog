@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useSearchParams } from 'react-router-dom'
+import { useState, useEffect } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { LanguageProvider } from './context/LanguageContext'
@@ -10,6 +11,7 @@ import Journal from './pages/Journal'
 import TradeForm from './pages/TradeForm'
 import Settings from './pages/Settings'
 import Landing from './pages/Landing'
+import WelcomeModal from './components/WelcomeModal'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -23,19 +25,33 @@ function ProtectedRoute({ children }) {
 }
 
 function AppRoutes() {
+  const [showWelcome, setShowWelcome] = useState(false)
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  useEffect(() => {
+    if (searchParams.get('payment') === 'success') {
+      setShowWelcome(true)
+      searchParams.delete('payment')
+      setSearchParams(searchParams, { replace: true })
+    }
+  }, [])
+
   return (
-    <Routes>
-      <Route path="/landing" element={<Landing />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-        <Route index element={<Dashboard />} />
-        <Route path="journal" element={<Journal />} />
-        <Route path="new" element={<TradeForm />} />
-        <Route path="edit/:id" element={<TradeForm />} />
-        <Route path="settings" element={<Settings />} />
-      </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <>
+      {showWelcome && <WelcomeModal onClose={() => setShowWelcome(false)} />}
+      <Routes>
+        <Route path="/landing" element={<Landing />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+          <Route index element={<Dashboard />} />
+          <Route path="journal" element={<Journal />} />
+          <Route path="new" element={<TradeForm />} />
+          <Route path="edit/:id" element={<TradeForm />} />
+          <Route path="settings" element={<Settings />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </>
   )
 }
 
