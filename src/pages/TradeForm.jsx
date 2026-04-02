@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { useLang } from '../context/LanguageContext'
@@ -300,6 +300,8 @@ const DEFAULT_SECTION_ORDER = ['basic', 'direction', 'prices', 'confirmations', 
 export default function TradeForm() {
   const { id } = useParams()
   const isEditing = Boolean(id)
+  const location = useLocation()
+  const duplicateData = !isEditing ? location.state?.duplicate : null
   const { user } = useAuth()
   const { t } = useLang()
   const isMobile = useIsMobile()
@@ -399,6 +401,31 @@ export default function TradeForm() {
     async function init() {
       await Promise.all([fetchConfirmations(), fetchUserSettings()])
       if (isEditing) await fetchTrade()
+      else if (duplicateData) {
+        setFormData({
+          date: today(),
+          time: duplicateData.time || currentTime(),
+          exit_time: '',
+          pair: duplicateData.pair || 'XAUUSD',
+          direction: duplicateData.direction || 'Long',
+          entry: duplicateData.entry?.toString() || '',
+          sl: duplicateData.sl?.toString() || '',
+          tp: duplicateData.tp?.toString() || '',
+          sl_pips: duplicateData.sl_pips?.toString() || '',
+          risk_pct: duplicateData.risk_pct?.toString() || '0.5',
+          confirmations: duplicateData.confirmations || [],
+          outcome: 'Open',
+          notes: duplicateData.notes || '',
+          rating: duplicateData.rating || null,
+          trade_type: duplicateData.trade_type || 'live',
+          missed_reason: duplicateData.missed_reason || '',
+          sl_to_be: duplicateData.sl_to_be || false,
+          be_at: duplicateData.be_at || 3,
+          exit_levels: duplicateData.exit_levels || [],
+          exit_mode_name: '',
+          pot_rr: duplicateData.pot_rr?.toString() || '',
+        })
+      }
       setFetching(false)
       setTimeout(() => setVisible(true), 10)
     }

@@ -27,6 +27,8 @@ export function UserSettingsProvider({ children }) {
   const [longColor, setLongColor] = useState(DEFAULT_LONG)
   const [shortColor, setShortColor] = useState(DEFAULT_SHORT)
   const [plan, setPlan] = useState('free')
+  const [accountSize, setAccountSize] = useState(10000)
+  const [showDollarValues, setShowDollarValues] = useState(false)
 
   useEffect(() => {
     applyColors(DEFAULT_LONG, DEFAULT_SHORT)
@@ -36,7 +38,7 @@ export function UserSettingsProvider({ children }) {
     if (!user) return
     supabase
       .from('user_settings')
-      .select('long_color, short_color, plan')
+      .select('long_color, short_color, plan, account_size, show_dollar_values')
       .eq('user_id', user.id)
       .maybeSingle()
       .then(({ data }) => {
@@ -46,6 +48,8 @@ export function UserSettingsProvider({ children }) {
         setShortColor(sc)
         applyColors(lc, sc)
         setPlan(data?.plan || 'free')
+        if (data?.account_size != null) setAccountSize(data.account_size)
+        if (data?.show_dollar_values != null) setShowDollarValues(data.show_dollar_values)
       })
   }, [user])
 
@@ -56,7 +60,7 @@ export function UserSettingsProvider({ children }) {
   }
 
   return (
-    <UserSettingsContext.Provider value={{ longColor, shortColor, updateColors, plan }}>
+    <UserSettingsContext.Provider value={{ longColor, shortColor, updateColors, plan, accountSize, setAccountSize, showDollarValues, setShowDollarValues }}>
       {children}
     </UserSettingsContext.Provider>
   )

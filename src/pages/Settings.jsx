@@ -92,7 +92,9 @@ function SortableItem({ item, onDelete }) {
 export default function Settings() {
   const { user } = useAuth()
   const { t } = useLang()
-  const { updateColors } = useUserSettings()
+  const { updateColors, accountSize: ctxAccountSize, setAccountSize: ctxSetAccountSize, showDollarValues: ctxShowDollar, setShowDollarValues: ctxSetShowDollar } = useUserSettings()
+  const [accountSize, setAccountSizeLocal] = useState(ctxAccountSize || 10000)
+  const [showDollarValues, setShowDollarValuesLocal] = useState(ctxShowDollar || false)
 
   // Confirmations state
   const [confirmations, setConfirmations] = useState([])
@@ -278,6 +280,8 @@ export default function Settings() {
       pairs,
       default_risk_pct: parseFloat(defaultRisk) || 0.5,
       default_outcome: defaultOutcome,
+      account_size: parseFloat(accountSize) || 10000,
+      show_dollar_values: showDollarValues,
       long_color: longColor,
       short_color: shortColor,
       exit_modes: exitModes,
@@ -288,6 +292,8 @@ export default function Settings() {
       setTimeout(() => setToast(''), 5000)
     } else {
       updateColors(longColor, shortColor)
+      ctxSetAccountSize(accountSize)
+      ctxSetShowDollar(showDollarValues)
       setIsDirty(false)
       showToast(t.saved)
     }
@@ -592,6 +598,47 @@ export default function Settings() {
       )}
 
       {activeTab === 'general' && (<>
+
+      {/* ── Account Settings ── */}
+      <div style={cardStyle}>
+        <p style={sectionTitle}>Account</p>
+        <p style={sectionSub}>Used to calculate dollar values across the dashboard</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div>
+            <p style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text)', marginBottom: '8px' }}>Account Size ($)</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ color: 'var(--text-muted)', fontSize: '14px' }}>$</span>
+              <input
+                type="number"
+                min="0"
+                step="100"
+                value={accountSize}
+                onChange={e => { setAccountSizeLocal(Number(e.target.value)); setIsDirty(true) }}
+                style={{ ...inputStyle, maxWidth: '160px' }}
+              />
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <button
+              onClick={() => { setShowDollarValuesLocal(v => !v); setIsDirty(true) }}
+              style={{
+                width: '44px', height: '24px', borderRadius: '12px', border: 'none', cursor: 'pointer',
+                background: showDollarValues ? 'var(--accent)' : 'var(--border-strong)',
+                position: 'relative', transition: 'background 0.2s', flexShrink: 0,
+              }}
+            >
+              <span style={{
+                position: 'absolute', top: '3px',
+                left: showDollarValues ? '22px' : '3px',
+                width: '18px', height: '18px', borderRadius: '50%',
+                background: '#fff', transition: 'left 0.2s',
+              }} />
+            </button>
+            <p style={{ fontSize: '13px', color: 'var(--text)' }}>Show Dollar Values</p>
+            <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Adds ($X) next to % P&L values</p>
+          </div>
+        </div>
+      </div>
 
       {/* ── Direction Colors ── */}
       <div style={cardStyle}>

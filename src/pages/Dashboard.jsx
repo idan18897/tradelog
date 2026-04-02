@@ -9,6 +9,7 @@ import { useAuth } from '../context/AuthContext'
 import { useLang } from '../context/LanguageContext'
 import DatePicker from '../components/DatePicker'
 import { computePnL } from '../lib/utils'
+import { useUserSettings } from '../context/UserSettingsContext'
 
 function formatDate(iso) {
   if (!iso) return '--'
@@ -46,6 +47,7 @@ const CustomTooltip = ({ active, payload }) => {
 export default function Dashboard() {
   const { user } = useAuth()
   const { t } = useLang()
+  const { accountSize, showDollarValues } = useUserSettings()
   const [trades, setTrades] = useState([])
   const [loading, setLoading] = useState(true)
   const [visible, setVisible] = useState(false)
@@ -360,6 +362,34 @@ export default function Dashboard() {
   const equityMin = Math.min(...equityData.map(d => d.value))
   const equityPositive = equityFinal >= 0
 
+  // Max Drawdown
+  let maxDrawdown = 0
+  let peak = -Infinity
+  for (const d of equityData) {
+    if (d.value > peak) peak = d.value
+    const dd = peak - d.value
+    if (dd > maxDrawdown) maxDrawdown = dd
+  }
+  const maxDrawdownPct = equityData.length > 1 ? parseFloat(maxDrawdown.toFixed(2)) : null
+
+  // Risk of Ruin
+  const edge = winRateRaw * avgWinPnL - lossRateRaw * avgLossPnL
+  const rorTarget = 20 // 20% account loss
+  let riskOfRuin = null
+  if (closedLive.length >= 5 && avgLossPnL > 0) {
+    const avgBet = avgLossPnL
+    const ruinSteps = Math.ceil(rorTarget / avgBet)
+    const q = edge > 0 ? Math.pow((1 - edge / avgWinPnL) / (1 + edge / avgWinPnL), ruinSteps) : 1
+    riskOfRuin = parseFloat(Math.min(q * 100, 100).toFixed(1))
+  }
+
+  // Dollar P&L helper
+  function dollarStr(pct) {
+    if (!showDollarValues || !accountSize) return ''
+    const val = (pct / 100) * accountSize
+    return ` ($${val >= 0 ? '+' : ''}${val.toFixed(0)})`
+  }
+
   const grossProfit = tpTrades.reduce((s, tr) => s + computePnL(tr), 0)
   const grossLoss = slTrades.reduce((s, tr) => s + Math.abs(computePnL(tr)), 0)
   const profitFactor = grossLoss > 0 ? parseFloat((grossProfit / grossLoss).toFixed(2)) : null
@@ -416,7 +446,7 @@ export default function Dashboard() {
     {
       label: t.monthlyPnl,
       value: monthTrades.length > 0
-        ? `${monthlyPnL >= 0 ? '+' : ''}${monthlyPnL.toFixed(2)}%`
+        ? `${monthlyPnL >= 0 ? '+' : ''}${monthlyPnL.toFixed(2)}%${dollarStr(monthlyPnL)}`
         : '--',
       sub: `${monthTrades.length} trades this month`,
       color: monthlyPnL >= 0 ? '#4ade80' : '#f87171',
@@ -464,6 +494,20 @@ export default function Dashboard() {
       sub: '(Win Rate × Avg Win) − (Loss Rate × Avg Loss)',
       color: expectancy >= 0 ? '#30D158' : '#FF453A',
       tooltip: 'Expected P&L per trade based on win rate and avg outcomes',
+    }] : []),
+    ...(maxDrawdownPct !== null ? [{
+      label: 'Max Drawdown',
+      value: `-${maxDrawdownPct}%`,
+      sub: 'Peak to trough on equity curve',
+      color: '#FF453A',
+      tooltip: 'Largest peak-to-trough drop in cumulative P&L',
+    }] : []),
+    ...(riskOfRuin !== null ? [{
+      label: 'Risk of Ruin',
+      value: `${riskOfRuin}%`,
+      sub: 'Probability of -20% account loss',
+      color: riskOfRuin < 5 ? '#30D158' : riskOfRuin < 20 ? '#FF9F0A' : '#FF453A',
+      tooltip: 'Statistical risk of losing 20% of your account\n<5% = safe  |  5–20% = caution  |  >20% = high risk',
     }] : []),
   ]
 
@@ -847,7 +891,7 @@ export default function Dashboard() {
                       <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>{d.label}</p>
                       {d.pair && <p style={{ fontSize: '12px', color: 'var(--text)', marginBottom: '2px' }}>{d.pair} · {d.outcome}</p>}
                       <p style={{ fontSize: '15px', fontWeight: 700, color: d.value >= 0 ? '#0A84FF' : '#f87171' }}>
-                        {d.value >= 0 ? '+' : ''}{d.value}%
+                        {d.value >= 0 ? '+' : ''}{d.value}%{dollarStr(d.value)}
                       </p>
                     </div>
                   )
