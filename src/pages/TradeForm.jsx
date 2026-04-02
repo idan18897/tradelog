@@ -743,7 +743,7 @@ export default function TradeForm() {
                           <DatePicker value={formData.date} onChange={val => handleField('date', val)} />
                         </div>
                         <div>
-                          <label style={labelStyle}>{t.time}</label>
+                          <label style={labelStyle}>Entry Time</label>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <input type="number" min="0" max="23" value={parseInt(timeHours, 10)} onChange={e => setTimeHours(e.target.value)} style={{ ...inputStyle, width: '64px', textAlign: 'center', padding: '8px 6px' }} placeholder="HH" />
                             <span style={{ color: 'var(--text-muted)', fontWeight: 700, fontSize: '16px', flexShrink: 0 }}>:</span>

@@ -615,10 +615,10 @@ export default function Journal() {
   }
 
   const headers = activeTab === 'backtest'
-    ? [t.date, t.time, 'Type', t.pair, t.direction, t.entry, 'Pot. R:R', t.outcome, t.tradeRating || 'Rating', t.actions]
+    ? [t.date, 'Entry Time', 'Type', t.pair, t.direction, t.entry, 'Pot. R:R', t.outcome, t.tradeRating || 'Rating', t.actions]
     : activeTab === 'combined'
-      ? [t.date, t.time, 'Type', t.pair, t.direction, t.entry, t.slPips, 'Pot. R:R', t.risk, t.outcome, t.tradeRating || 'Rating', t.confirmations, t.actions]
-      : [t.date, t.time, t.pair, t.direction, t.entry, t.slPips, 'Pot. R:R', t.risk, t.outcome, t.tradeRating || 'Rating', t.confirmations, t.screenshot, t.actions]
+      ? [t.date, 'Entry Time', 'Type', t.pair, t.direction, t.entry, t.slPips, 'Pot. R:R', t.risk, t.outcome, t.tradeRating || 'Rating', t.confirmations, t.actions]
+      : [t.date, 'Entry Time', t.pair, t.direction, t.entry, t.slPips, 'Pot. R:R', t.risk, t.outcome, t.tradeRating || 'Rating', t.confirmations, t.screenshot, t.actions]
 
   if (loading) {
     return (

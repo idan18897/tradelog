@@ -271,6 +271,62 @@ export default function Dashboard() {
       pnl: parseFloat(h.trades.reduce((s, tr) => s + computePnL(tr), 0).toFixed(2)),
     }))
 
+  // Average Holding Time
+  function parseTimeToMinutes(t) {
+    if (!t) return null
+    const parts = t.split(':')
+    if (parts.length < 2) return null
+    return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10)
+  }
+  const holdingTimes = allLiveTrades.filter(inDateRange).filter(tr =>
+    tr.time && tr.exit_time && !['Open', 'Invalid'].includes(tr.outcome)
+  ).map(tr => {
+    const entry = parseTimeToMinutes(tr.time)
+    const exit = parseTimeToMinutes(tr.exit_time)
+    if (entry === null || exit === null) return null
+    const diff = exit >= entry ? exit - entry : (24 * 60 - entry) + exit
+    return diff
+  }).filter(v => v !== null && v > 0)
+  const avgHoldMinutes = holdingTimes.length
+    ? Math.round(holdingTimes.reduce((s, v) => s + v, 0) / holdingTimes.length)
+    : null
+  const avgHoldStr = avgHoldMinutes !== null
+    ? avgHoldMinutes >= 60
+      ? `${Math.floor(avgHoldMinutes / 60)}h ${avgHoldMinutes % 60}m`
+      : `${avgHoldMinutes}m`
+    : '--'
+
+  // Expectancy
+  const closedLive = allLiveTrades.filter(inDateRange).filter(tr =>
+    ['TP', 'Partial TP', 'SL', 'BE'].includes(tr.outcome)
+  )
+  const wins = closedLive.filter(tr => tr.outcome === 'TP' || tr.outcome === 'Partial TP')
+  const losses = closedLive.filter(tr => tr.outcome === 'SL')
+  const winRateRaw = closedLive.length ? wins.length / closedLive.length : 0
+  const lossRateRaw = closedLive.length ? losses.length / closedLive.length : 0
+  const avgWinPnL = wins.length ? wins.reduce((s, tr) => s + computePnL(tr), 0) / wins.length : 0
+  const avgLossPnL = losses.length ? Math.abs(losses.reduce((s, tr) => s + computePnL(tr), 0) / losses.length) : 0
+  const expectancy = closedLive.length >= 2
+    ? parseFloat(((winRateRaw * avgWinPnL) - (lossRateRaw * avgLossPnL)).toFixed(2))
+    : null
+
+  // Performance by Pair
+  const pairMap = {}
+  allLiveTrades.filter(inDateRange).filter(tr => !['Open', 'Invalid'].includes(tr.outcome)).forEach(tr => {
+    const p = tr.pair || 'Unknown'
+    if (!pairMap[p]) pairMap[p] = { pair: p, trades: [], tp: 0, closed: 0 }
+    pairMap[p].trades.push(tr)
+    if (tr.outcome === 'TP' || tr.outcome === 'Partial TP') { pairMap[p].tp++; pairMap[p].closed++ }
+    else if (['SL', 'BE'].includes(tr.outcome)) pairMap[p].closed++
+  })
+  const perfByPair = Object.values(pairMap).map(p => {
+    const tp = p.trades.filter(tr => tr.outcome === 'TP' || tr.outcome === 'Partial TP')
+    const winRate = p.closed ? Math.round(p.tp / p.closed * 100) : null
+    const avgRR = tp.length ? parseFloat((tp.reduce((s, tr) => s + (tr.rr_potential || 0), 0) / tp.length).toFixed(2)) : null
+    const pnl = parseFloat(p.trades.reduce((s, tr) => s + computePnL(tr), 0).toFixed(2))
+    return { pair: p.pair, total: p.trades.length, winRate, avgRR, pnl }
+  }).sort((a, b) => b.pnl - a.pnl)
+
   // Exit Hour distribution (trades that have exit_time filled)
   const exitHourMap = {}
   liveTrades.forEach(tr => {
@@ -395,6 +451,19 @@ export default function Dashboard() {
       sub: `${grossProfit.toFixed(2)}% gross profit`,
       color: profitFactor >= 1.5 ? '#4ade80' : profitFactor >= 1 ? '#facc15' : '#f87171',
       tooltip: 'Gross Profit ÷ Gross Loss\n>1.5 = good  |  <1 = losing',
+    }] : []),
+    ...(avgHoldMinutes !== null ? [{
+      label: 'Avg Hold Time',
+      value: avgHoldStr,
+      sub: `${holdingTimes.length} trades with exit time`,
+      color: 'var(--text)',
+    }] : []),
+    ...(expectancy !== null ? [{
+      label: 'Expectancy',
+      value: `${expectancy >= 0 ? '+' : ''}${expectancy}%`,
+      sub: '(Win Rate × Avg Win) − (Loss Rate × Avg Loss)',
+      color: expectancy >= 0 ? '#30D158' : '#FF453A',
+      tooltip: 'Expected P&L per trade based on win rate and avg outcomes',
     }] : []),
   ]
 
@@ -977,6 +1046,51 @@ export default function Dashboard() {
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Performance by Pair */}
+      {perfByPair.length > 0 && (
+        <div style={{ ...cardStyle, padding: '20px', marginBottom: '20px' }}>
+          <h2 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', marginBottom: '16px' }}>
+            Performance by Pair
+          </h2>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+              <thead>
+                <tr>
+                  {['Pair', 'Trades', 'Win Rate', 'Avg R:R', 'P&L'].map(h => (
+                    <th key={h} style={{
+                      padding: '8px 12px', textAlign: h === 'Pair' ? 'left' : 'right',
+                      color: 'var(--text-muted)', fontWeight: 600, fontSize: '11px',
+                      textTransform: 'uppercase', letterSpacing: '0.05em',
+                      borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap',
+                    }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {perfByPair.map((p, i) => (
+                  <tr key={p.pair} style={{ borderBottom: i < perfByPair.length - 1 ? '1px solid var(--border)' : 'none' }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--card-hover)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <td style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--text)' }}>{p.pair}</td>
+                    <td style={{ padding: '10px 12px', textAlign: 'right', color: 'var(--text-muted)' }}>{p.total}</td>
+                    <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600, color: p.winRate >= 60 ? '#0A84FF' : p.winRate >= 40 ? '#f59e0b' : '#f87171' }}>
+                      {p.winRate !== null ? `${p.winRate}%` : '--'}
+                    </td>
+                    <td style={{ padding: '10px 12px', textAlign: 'right', color: 'var(--text)' }}>
+                      {p.avgRR !== null ? `1:${p.avgRR}` : '--'}
+                    </td>
+                    <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: p.pnl >= 0 ? '#30D158' : '#FF453A' }}>
+                      {p.pnl >= 0 ? '+' : ''}{p.pnl.toFixed(2)}%
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
