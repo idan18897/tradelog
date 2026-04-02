@@ -471,6 +471,9 @@ export default function Journal() {
   const [filterOutcome, setFilterOutcome] = useState('All')
   const [filterDirection, setFilterDirection] = useState('All')
   const [filterRating, setFilterRating] = useState(0)
+  const [filterType, setFilterType] = useState('All')
+  const [filterDateFrom, setFilterDateFrom] = useState('')
+  const [filterDateTo, setFilterDateTo] = useState('')
   const [sortKey, setSortKey] = useState('date')
   const [sortDir, setSortDir] = useState('desc')
   const [selectedTrade, setSelectedTrade] = useState(null)
@@ -600,10 +603,13 @@ export default function Journal() {
   const filteredRaw = activeList.filter(tr => {
     if (filterDay && tr.date !== filterDay) return false
     else if (!filterDay && filterMonth !== 'All' && tr.date?.slice(0, 7) !== filterMonth) return false
+    if (filterDateFrom && tr.date && tr.date < filterDateFrom) return false
+    if (filterDateTo && tr.date && tr.date > filterDateTo) return false
     if (filterPair !== 'All' && tr.pair !== filterPair) return false
     if (filterOutcome !== 'All' && tr.outcome !== filterOutcome) return false
     if (filterDirection !== 'All' && tr.direction !== filterDirection) return false
     if (filterRating > 0 && (tr.rating || 0) < filterRating) return false
+    if (filterType !== 'All' && (tr.trade_type || 'live') !== filterType) return false
     return true
   })
 
@@ -1076,6 +1082,33 @@ export default function Journal() {
           <option value={4}>⭐⭐⭐⭐ +</option>
           <option value={5}>⭐⭐⭐⭐⭐</option>
         </select>
+        <select value={filterType} onChange={e => setFilterType(e.target.value)} style={{ width: 'auto' }}>
+          <option value="All">All Types</option>
+          <option value="live">Live</option>
+          <option value="missed">Missed</option>
+        </select>
+        <input
+          type="date"
+          value={filterDateFrom}
+          onChange={e => setFilterDateFrom(e.target.value)}
+          title="From date"
+          style={{ width: 'auto', padding: '7px 10px', fontSize: '13px' }}
+        />
+        <span style={{ color: 'var(--text-muted)', fontSize: '12px', alignSelf: 'center' }}>→</span>
+        <input
+          type="date"
+          value={filterDateTo}
+          onChange={e => setFilterDateTo(e.target.value)}
+          title="To date"
+          style={{ width: 'auto', padding: '7px 10px', fontSize: '13px' }}
+        />
+        {(filterDateFrom || filterDateTo) && (
+          <button
+            onClick={() => { setFilterDateFrom(''); setFilterDateTo('') }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '18px', padding: '0', lineHeight: 1 }}
+            title="Clear date range"
+          >✕</button>
+        )}
       </div>
 
       {/* Quick Stats */}
