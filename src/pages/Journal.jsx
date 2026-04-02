@@ -679,11 +679,28 @@ export default function Journal() {
     boxShadow: 'var(--shadow-md)',
   }
 
-  const headers = activeTab === 'backtest'
-    ? [t.date, 'Entry Time', 'Type', t.pair, t.direction, t.entry, 'Pot. R:R', t.outcome, t.tradeRating || 'Rating', t.actions]
+  const allHeaders = [
+    { label: t.date,              key: 'date' },
+    { label: 'Entry Time',        key: 'Entry Time' },
+    { label: 'Type',              key: null },
+    { label: t.pair,              key: 'Pair' },
+    { label: t.direction,         key: 'Direction' },
+    { label: t.entry,             key: 'Entry' },
+    { label: t.slPips,            key: 'SL Pips' },
+    { label: 'Pot. R:R',         key: 'Pot. R:R' },
+    { label: t.risk,              key: 'Risk%' },
+    { label: t.outcome,           key: 'Outcome' },
+    { label: t.tradeRating || 'Trade Rating', key: 'Rating' },
+    { label: t.confirmations,     key: null },
+    { label: t.screenshot,        key: null },
+    { label: t.actions,           key: null },
+  ]
+  const headerKeys = activeTab === 'backtest'
+    ? ['date','Entry Time','Type','Pair','Direction','Entry','Pot. R:R','Outcome','Rating','actions']
     : activeTab === 'combined'
-      ? [t.date, 'Entry Time', 'Type', t.pair, t.direction, t.entry, t.slPips, 'Pot. R:R', t.risk, t.outcome, t.tradeRating || 'Rating', t.confirmations, t.actions]
-      : [t.date, 'Entry Time', t.pair, t.direction, t.entry, t.slPips, 'Pot. R:R', t.risk, t.outcome, t.tradeRating || 'Rating', t.confirmations, t.screenshot, t.actions]
+      ? ['date','Entry Time','Type','Pair','Direction','Entry','SL Pips','Pot. R:R','Risk%','Outcome','Rating','confirmations','actions']
+      : ['date','Entry Time','Pair','Direction','Entry','SL Pips','Pot. R:R','Risk%','Outcome','Rating','confirmations','screenshot','actions']
+  const headers = headerKeys.map(k => allHeaders.find(h => h.key === k || (k === 'actions' && h.label === t.actions) || (k === 'confirmations' && h.label === t.confirmations) || (k === 'screenshot' && h.label === t.screenshot)) || { label: k, key: null })
 
   if (loading) {
     return (
@@ -1145,13 +1162,12 @@ export default function Journal() {
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border)' }}>
                   {headers.map(h => {
-                    const sortable = h in SORT_KEYS || h === 'date'
-                    const key = h === t.date ? 'date' : h
-                    const isActive = sortKey === key
+                    const sortable = !!h.key && h.key in SORT_KEYS
+                    const isActive = sortable && sortKey === h.key
                     return (
                       <th
-                        key={h}
-                        onClick={sortable ? () => handleSort(key) : undefined}
+                        key={h.label}
+                        onClick={sortable ? () => handleSort(h.key) : undefined}
                         style={{
                           padding: '10px 12px', textAlign: 'start',
                           fontSize: '11px', fontWeight: 600,
@@ -1162,7 +1178,7 @@ export default function Journal() {
                           userSelect: 'none',
                         }}
                       >
-                        {h}{isActive ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}
+                        {h.label}{isActive ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}
                       </th>
                     )
                   })}
