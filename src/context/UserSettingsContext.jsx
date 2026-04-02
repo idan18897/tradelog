@@ -26,9 +26,9 @@ export function UserSettingsProvider({ children }) {
   const { user } = useAuth()
   const [longColor, setLongColor] = useState(DEFAULT_LONG)
   const [shortColor, setShortColor] = useState(DEFAULT_SHORT)
+  const [plan, setPlan] = useState('free')
 
   useEffect(() => {
-    // Apply defaults immediately so the app never flickers with wrong colors
     applyColors(DEFAULT_LONG, DEFAULT_SHORT)
   }, [])
 
@@ -36,7 +36,7 @@ export function UserSettingsProvider({ children }) {
     if (!user) return
     supabase
       .from('user_settings')
-      .select('long_color, short_color')
+      .select('long_color, short_color, plan')
       .eq('user_id', user.id)
       .maybeSingle()
       .then(({ data }) => {
@@ -45,6 +45,7 @@ export function UserSettingsProvider({ children }) {
         setLongColor(lc)
         setShortColor(sc)
         applyColors(lc, sc)
+        setPlan(data?.plan || 'free')
       })
   }, [user])
 
@@ -55,7 +56,7 @@ export function UserSettingsProvider({ children }) {
   }
 
   return (
-    <UserSettingsContext.Provider value={{ longColor, shortColor, updateColors }}>
+    <UserSettingsContext.Provider value={{ longColor, shortColor, updateColors, plan }}>
       {children}
     </UserSettingsContext.Provider>
   )

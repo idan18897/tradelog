@@ -4,7 +4,9 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { useLang } from '../context/LanguageContext'
 import { useIsMobile } from '../hooks/useIsMobile'
+import { useUserSettings } from '../context/UserSettingsContext'
 import DatePicker from '../components/DatePicker'
+import UpgradeModal from '../components/UpgradeModal'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -302,6 +304,8 @@ export default function TradeForm() {
   const { t } = useLang()
   const isMobile = useIsMobile()
   const navigate = useNavigate()
+  const { plan } = useUserSettings()
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
 
   const [formData, setFormData] = useState({
     date: today(),
@@ -535,6 +539,20 @@ export default function TradeForm() {
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
+
+    // Free tier: max 10 live trades
+    if (!isEditing && plan === 'free') {
+      const { count } = await supabase
+        .from('trades')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('trade_type', 'live')
+      if (count >= 10) {
+        setShowUpgradeModal(true)
+        return
+      }
+    }
+
     setLoading(true)
 
     try {
@@ -656,6 +674,7 @@ export default function TradeForm() {
       className={`page-wrap transition-all duration-300 ${visible ? 'fade-in' : 'opacity-0'}`}
       style={{ padding: '28px 32px', maxWidth: '1100px', margin: '0 auto' }}
     >
+      {showUpgradeModal && <UpgradeModal onClose={() => setShowUpgradeModal(false)} />}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '22px' }}>
         <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text)' }}>
           {isEditing ? t.editTradeTitle : t.newTradeTitle}

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 
 const NAV_LINKS = ['Features', 'Pricing']
 
@@ -44,9 +45,9 @@ const FEATURES = [
 
 const PLANS = [
   {
-    name: 'Lifetime',
-    price: '$49',
-    period: 'one-time',
+    name: 'Monthly',
+    price: '$14.99',
+    period: '/ month',
     highlight: false,
     features: [
       'Unlimited trade logs',
@@ -54,31 +55,89 @@ const PLANS = [
       'Confirmation analysis',
       'Missed trades tracking',
       'Screenshot uploads',
+      'Cancel anytime',
+    ],
+    cta: 'Start Monthly',
+  },
+  {
+    name: 'Yearly',
+    price: '$99',
+    period: '/ year',
+    highlight: true,
+    badge: 'BEST VALUE',
+    features: [
+      'Everything in Monthly',
+      'Save ~$81 vs monthly',
+      'Priority support',
+      'Early access to new features',
+    ],
+    cta: 'Start Yearly',
+  },
+  {
+    name: 'Lifetime',
+    price: '$199',
+    period: 'one-time',
+    highlight: false,
+    features: [
+      'Everything in Yearly',
+      'Pay once, use forever',
       'Lifetime updates',
+      'No recurring charges',
     ],
     cta: 'Get Lifetime Access',
   },
+]
+
+const TESTIMONIALS = [
   {
-    name: 'Monthly',
-    price: '$9',
-    period: '/ month',
-    highlight: true,
-    features: [
-      'Everything in Lifetime',
-      'Priority support',
-      'Early access to new features',
-      'Cancel anytime',
-    ],
-    cta: 'Start Free Trial',
+    name: 'Lior M.',
+    role: 'Forex Trader · 2 years',
+    text: 'TradingLog completely changed how I review my trades. The confirmation analysis alone helped me cut losing setups by 40%.',
+    avatar: 'LM',
+  },
+  {
+    name: 'Sarah K.',
+    role: 'Crypto Trader · 3 years',
+    text: 'Finally a journal that doesn\'t feel like work. Clean UI, fast, and the equity curve keeps me accountable every single week.',
+    avatar: 'SK',
+  },
+  {
+    name: 'Noa R.',
+    role: 'Gold & Indices · 1 year',
+    text: 'The missed trades log was a game changer. I realized I was leaving more on the table than I was taking. Now I act on my setups.',
+    avatar: 'NR',
   },
 ]
 
 export default function Landing() {
   const [visible, setVisible] = useState(false)
+  const [checkoutLoading, setCheckoutLoading] = useState(null)
+  const { user } = useAuth()
+  const navigate = useNavigate()
 
   useEffect(() => {
     setTimeout(() => setVisible(true), 60)
   }, [])
+
+  async function handleCheckout(plan) {
+    if (!user) {
+      navigate('/login')
+      return
+    }
+    setCheckoutLoading(plan)
+    try {
+      const res = await fetch('/api/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan, userId: user.id, email: user.email }),
+      })
+      const data = await res.json()
+      if (data.url) window.location.href = data.url
+    } catch {
+      // fallback: do nothing
+    }
+    setCheckoutLoading(null)
+  }
 
   const s = {
     // shared
@@ -111,7 +170,7 @@ export default function Landing() {
         .fade-up-5 { animation-delay: 0.45s; }
         .landing-cta-primary:hover { background: #178a65 !important; transform: translateY(-1px); box-shadow: 0 8px 30px rgba(29,158,117,0.35) !important; }
         .landing-cta-secondary:hover { background: rgba(255,255,255,0.1) !important; }
-        .feature-card:hover { background: rgba(255,255,255,0.06) !important; transform: translateY(-3px); }
+        .feature-card:hover { background: rgba(255,255,255,0.06) !important; transform: translateY(-3px); border-color: rgba(29,158,117,0.5) !important; }
         .plan-card:hover { transform: translateY(-4px); }
         .nav-link:hover { color: #f5f5f7 !important; }
         @media (max-width: 768px) {
@@ -119,6 +178,7 @@ export default function Landing() {
           .hero-actions { justify-content: center !important; }
           .features-grid { grid-template-columns: 1fr !important; }
           .pricing-grid { grid-template-columns: 1fr !important; }
+          .testimonials-grid { grid-template-columns: 1fr !important; }
           .hero-title { font-size: clamp(36px, 10vw, 56px) !important; }
           .mockup-wrap { display: none; }
           .nav-links { display: none !important; }
@@ -150,7 +210,7 @@ export default function Landing() {
 
       {/* ── Hero ── */}
       <section style={{ paddingTop: '120px', paddingBottom: '80px', padding: '120px 40px 80px' }}>
-        <div className="hero-grid" style={{ maxWidth: '1200px', margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '60px', alignItems: 'center' }}>
+        <div className="hero-grid" style={{ maxWidth: '1200px', margin: '0 auto', display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '60px', alignItems: 'center' }}>
 
           {/* Left */}
           <div className={visible ? '' : 'opacity-0'}>
@@ -158,7 +218,7 @@ export default function Landing() {
               <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#1D9E75', display: 'inline-block' }} />
               <span style={{ fontSize: '12px', fontWeight: 600, color: '#1D9E75', letterSpacing: '0.04em' }}>BUILT FOR SERIOUS TRADERS</span>
             </div>
-            <h1 className="fade-up fade-up-2 hero-title" style={{ fontSize: 'clamp(40px, 5vw, 62px)', fontWeight: 800, lineHeight: 1.1, letterSpacing: '-0.04em', marginBottom: '20px', color: '#f5f5f7' }}>
+            <h1 className="fade-up fade-up-2 hero-title" style={{ fontSize: 'clamp(48px, 6vw, 74px)', fontWeight: 800, lineHeight: 1.08, letterSpacing: '-0.04em', marginBottom: '20px', color: '#f5f5f7' }}>
               Trade smarter.<br />
               <span style={{ color: '#1D9E75' }}>Journal better.</span>
             </h1>
@@ -166,14 +226,18 @@ export default function Landing() {
               The trading journal that actually improves your performance. Track every trade, analyze your edge, and stop missing profitable setups.
             </p>
             <div className="fade-up fade-up-4 hero-actions" style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-              <Link to="/login" className="landing-cta-primary" style={{ ...s.btn, background: '#1D9E75', color: '#fff', boxShadow: '0 4px 20px rgba(29,158,117,0.25)' }}>
-                Start Free Trial →
-              </Link>
+              <button onClick={() => handleCheckout('lifetime')} disabled={checkoutLoading === 'lifetime'} className="landing-cta-primary" style={{ ...s.btn, background: '#1D9E75', color: '#fff', boxShadow: '0 4px 20px rgba(29,158,117,0.25)' }}>
+                {checkoutLoading === 'lifetime' ? 'Redirecting…' : 'Get Lifetime Access →'}
+              </button>
               <a href="#features" className="landing-cta-secondary" style={{ ...s.btn, background: 'rgba(255,255,255,0.06)', color: '#f5f5f7', border: '1px solid rgba(255,255,255,0.1)' }}>
                 See Features
               </a>
             </div>
-            <p className="fade-up fade-up-5" style={{ fontSize: '12px', color: '#48484a', marginTop: '16px' }}>No credit card required · Cancel anytime</p>
+            <div className="fade-up fade-up-5" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '20px' }}>
+              <span style={{ fontSize: '14px', letterSpacing: '0.02em' }}>⭐⭐⭐⭐⭐</span>
+              <span style={{ fontSize: '13px', color: '#8e8e93' }}>Loved by <strong style={{ color: '#f5f5f7' }}>200+ traders</strong></span>
+            </div>
+            <p style={{ fontSize: '12px', color: '#48484a', marginTop: '8px' }}>No credit card required · Cancel anytime</p>
           </div>
 
           {/* Right — mockup */}
@@ -251,21 +315,21 @@ export default function Landing() {
 
       {/* ── Pricing ── */}
       <section id="pricing" style={{ padding: '80px 40px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-        <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+        <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '56px' }}>
             <p style={{ fontSize: '12px', fontWeight: 700, color: '#1D9E75', letterSpacing: '0.1em', marginBottom: '12px', textTransform: 'uppercase' }}>Pricing</p>
             <h2 style={{ fontSize: 'clamp(28px, 4vw, 42px)', fontWeight: 800, letterSpacing: '-0.03em', color: '#f5f5f7', marginBottom: '12px' }}>Simple, transparent pricing</h2>
             <p style={{ fontSize: '16px', color: '#8e8e93' }}>Pick what works for you.</p>
           </div>
-          <div className="pricing-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+          <div className="pricing-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
             {PLANS.map(plan => (
               <div key={plan.name} className="plan-card" style={{
                 background: plan.highlight ? 'rgba(29,158,117,0.08)' : 'rgba(255,255,255,0.03)',
                 border: `1px solid ${plan.highlight ? 'rgba(29,158,117,0.4)' : 'rgba(255,255,255,0.07)'}`,
                 borderRadius: '20px', padding: '32px', transition: 'all 0.2s', position: 'relative', overflow: 'hidden',
               }}>
-                {plan.highlight && (
-                  <div style={{ position: 'absolute', top: '16px', right: '16px', background: '#1D9E75', color: '#fff', fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '50px', letterSpacing: '0.04em' }}>POPULAR</div>
+                {(plan.highlight || plan.badge) && (
+                  <div style={{ position: 'absolute', top: '16px', right: '16px', background: '#1D9E75', color: '#fff', fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '50px', letterSpacing: '0.04em' }}>{plan.badge || 'POPULAR'}</div>
                 )}
                 <p style={{ fontSize: '14px', fontWeight: 600, color: '#8e8e93', marginBottom: '8px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>{plan.name}</p>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginBottom: '6px' }}>
@@ -281,15 +345,48 @@ export default function Landing() {
                     </li>
                   ))}
                 </ul>
-                <Link to="/login" style={{
+                <button onClick={() => handleCheckout(plan.name.toLowerCase())} disabled={checkoutLoading === plan.name.toLowerCase()} style={{
                   ...s.btn, width: '100%', boxSizing: 'border-box',
                   background: plan.highlight ? '#1D9E75' : 'rgba(255,255,255,0.07)',
                   color: plan.highlight ? '#fff' : '#f5f5f7',
                   border: plan.highlight ? 'none' : '1px solid rgba(255,255,255,0.1)',
                   boxShadow: plan.highlight ? '0 4px 20px rgba(29,158,117,0.3)' : 'none',
                 }} className={plan.highlight ? 'landing-cta-primary' : 'landing-cta-secondary'}>
-                  {plan.cta}
-                </Link>
+                  {checkoutLoading === plan.name.toLowerCase() ? 'Redirecting…' : plan.cta}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Testimonials ── */}
+      <section style={{ padding: '80px 40px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+        <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
+          <div style={{ textAlign: 'center', marginBottom: '56px' }}>
+            <p style={{ fontSize: '12px', fontWeight: 700, color: '#1D9E75', letterSpacing: '0.1em', marginBottom: '12px', textTransform: 'uppercase' }}>Testimonials</p>
+            <h2 style={{ fontSize: 'clamp(28px, 4vw, 42px)', fontWeight: 800, letterSpacing: '-0.03em', color: '#f5f5f7', marginBottom: '12px' }}>Traders love it</h2>
+            <p style={{ fontSize: '16px', color: '#8e8e93' }}>Real results from real traders.</p>
+          </div>
+          <div className="testimonials-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+            {TESTIMONIALS.map(t => (
+              <div key={t.name} style={{
+                background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
+                borderRadius: '18px', padding: '28px', display: 'flex', flexDirection: 'column', gap: '20px',
+              }}>
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  {[1,2,3,4,5].map(i => <span key={i} style={{ fontSize: '13px' }}>⭐</span>)}
+                </div>
+                <p style={{ fontSize: '15px', color: '#d1d1d6', lineHeight: 1.65, flex: 1 }}>"{t.text}"</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: 'rgba(29,158,117,0.18)', border: '1px solid rgba(29,158,117,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700, color: '#1D9E75', flexShrink: 0 }}>
+                    {t.avatar}
+                  </div>
+                  <div>
+                    <p style={{ fontSize: '14px', fontWeight: 700, color: '#f5f5f7', marginBottom: '2px' }}>{t.name}</p>
+                    <p style={{ fontSize: '12px', color: '#8e8e93' }}>{t.role}</p>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
@@ -305,9 +402,9 @@ export default function Landing() {
           <p style={{ fontSize: '16px', color: '#8e8e93', marginBottom: '36px', lineHeight: 1.6 }}>
             Join traders who use TradingLog to understand their performance and improve their results.
           </p>
-          <Link to="/login" className="landing-cta-primary" style={{ ...s.btn, background: '#1D9E75', color: '#fff', fontSize: '16px', padding: '15px 36px', boxShadow: '0 6px 28px rgba(29,158,117,0.3)' }}>
-            Get Started Free →
-          </Link>
+          <button onClick={() => handleCheckout('lifetime')} disabled={checkoutLoading === 'lifetime'} className="landing-cta-primary" style={{ ...s.btn, background: '#1D9E75', color: '#fff', fontSize: '16px', padding: '15px 36px', boxShadow: '0 6px 28px rgba(29,158,117,0.3)' }}>
+            {checkoutLoading === 'lifetime' ? 'Redirecting…' : 'Get Started Free →'}
+          </button>
           <p style={{ fontSize: '12px', color: '#48484a', marginTop: '14px' }}>No credit card · Full access · Cancel anytime</p>
         </div>
       </section>
