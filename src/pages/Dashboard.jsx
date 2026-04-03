@@ -29,14 +29,15 @@ function getOutcomeBadge(outcome) {
   return map[outcome] || { bg: 'rgba(156,163,175,0.15)', color: '#9ca3af' }
 }
 
-const CustomTooltip = ({ active, payload }) => {
+const CustomTooltip = ({ active, payload, showDollarValues, accountSize }) => {
   if (active && payload && payload.length) {
     const val = payload[0].value
+    const dollarPart = showDollarValues && accountSize ? ` ($${val >= 0 ? '+' : ''}${((val / 100) * accountSize).toFixed(0)})` : ''
     return (
       <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px' }}>
         <p style={{ color: 'var(--text-muted)', fontSize: '12px', marginBottom: '2px' }}>{payload[0].payload.label}</p>
         <p style={{ color: val >= 0 ? '#4ade80' : '#f87171', fontWeight: 600, fontSize: '14px' }}>
-          {val >= 0 ? '+' : ''}{val.toFixed(2)}%
+          {val >= 0 ? '+' : ''}{val.toFixed(2)}%{dollarPart}
         </p>
       </div>
     )
@@ -490,14 +491,14 @@ export default function Dashboard() {
     }] : []),
     ...(expectancy !== null ? [{
       label: 'Expectancy',
-      value: `${expectancy >= 0 ? '+' : ''}${expectancy}%`,
+      value: `${expectancy >= 0 ? '+' : ''}${expectancy}%${dollarStr(expectancy)}`,
       sub: '(Win Rate × Avg Win) − (Loss Rate × Avg Loss)',
       color: expectancy >= 0 ? '#30D158' : '#FF453A',
       tooltip: 'Expected P&L per trade based on win rate and avg outcomes',
     }] : []),
     ...(maxDrawdownPct !== null ? [{
       label: 'Max Drawdown',
-      value: `-${maxDrawdownPct}%`,
+      value: `-${maxDrawdownPct}%${dollarStr(-maxDrawdownPct)}`,
       sub: 'Peak to trough on equity curve',
       color: '#FF453A',
       tooltip: 'Largest peak-to-trough drop in cumulative P&L',
@@ -744,7 +745,7 @@ export default function Dashboard() {
                           </td>
                           <td style={{ padding: '12px 16px', fontSize: '13px', color: 'var(--text)', textAlign: 'right' }}>1:{c.avgRR || '--'}</td>
                           <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                            <span style={{ fontSize: '13px', fontWeight: 700, color: c.pnl >= 0 ? '#4ade80' : '#f87171' }}>{c.pnl >= 0 ? '+' : ''}{c.pnl}%</span>
+                            <span style={{ fontSize: '13px', fontWeight: 700, color: c.pnl >= 0 ? '#4ade80' : '#f87171' }}>{c.pnl >= 0 ? '+' : ''}{c.pnl}%{dollarStr(c.pnl)}</span>
                           </td>
                         </tr>
                       ))}
@@ -785,7 +786,7 @@ export default function Dashboard() {
                               <span style={{ fontSize: '13px', fontWeight: 600, color: c.winRate >= 60 ? '#4ade80' : c.winRate >= 45 ? '#f59e0b' : '#f87171' }}>{c.winRate}%</span>
                             </td>
                             <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                              <span style={{ fontSize: '13px', fontWeight: 700, color: c.pnl >= 0 ? '#4ade80' : '#f87171' }}>{c.pnl >= 0 ? '+' : ''}{c.pnl}%</span>
+                              <span style={{ fontSize: '13px', fontWeight: 700, color: c.pnl >= 0 ? '#4ade80' : '#f87171' }}>{c.pnl >= 0 ? '+' : ''}{c.pnl}%{dollarStr(c.pnl)}</span>
                             </td>
                           </tr>
                         ))}
@@ -936,7 +937,7 @@ export default function Dashboard() {
                 tickLine={false}
                 tickFormatter={v => `${v}%`}
               />
-              <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(128,128,128,0.06)' }} />
+              <Tooltip content={<CustomTooltip showDollarValues={showDollarValues} accountSize={accountSize} />} cursor={{ fill: 'rgba(128,128,128,0.06)' }} />
               <Bar dataKey="pnl" radius={[4, 4, 0, 0]}>
                 {chartData.map((entry, i) => (
                   <Cell key={i} fill={entry.pnl >= 0 ? '#0A84FF' : '#FF453A'} opacity={0.9} />
@@ -1077,7 +1078,7 @@ export default function Dashboard() {
                     {[
                       { label: 'TP / SL', value: `${session.tp} / ${session.sl}`, color: 'var(--text)' },
                       { label: 'Avg R:R', value: session.avgRR ? `1:${session.avgRR}` : '--', color: 'var(--accent)' },
-                      { label: 'Est. P&L', value: `${session.pnl >= 0 ? '+' : ''}${session.pnl.toFixed(1)}%`, color: session.pnl >= 0 ? '#4ade80' : '#f87171' },
+                      { label: 'Est. P&L', value: `${session.pnl >= 0 ? '+' : ''}${session.pnl.toFixed(1)}%${dollarStr(session.pnl)}`, color: session.pnl >= 0 ? '#4ade80' : '#f87171' },
                       { label: '% of All Trades', value: liveTrades.length ? `${Math.round(session.total / liveTrades.length * 100)}%` : '--', color: session.color },
                     ].map(stat => (
                       <div key={stat.label}>
@@ -1128,7 +1129,7 @@ export default function Dashboard() {
                       {p.avgRR !== null ? `1:${p.avgRR}` : '--'}
                     </td>
                     <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: p.pnl >= 0 ? '#30D158' : '#FF453A' }}>
-                      {p.pnl >= 0 ? '+' : ''}{p.pnl.toFixed(2)}%
+                      {p.pnl >= 0 ? '+' : ''}{p.pnl.toFixed(2)}%{dollarStr(p.pnl)}
                     </td>
                   </tr>
                 ))}
@@ -1183,9 +1184,9 @@ export default function Dashboard() {
                     </div>
                   </div>
                   {/* P&L */}
-                  <div style={{ width: '58px', flexShrink: 0, textAlign: 'start' }}>
+                  <div style={{ flexShrink: 0, textAlign: 'start' }}>
                     <span style={{ fontSize: '12px', fontWeight: 600, color: day.pnl >= 0 ? '#4ade80' : '#f87171' }}>
-                      {day.pnl >= 0 ? '+' : ''}{day.pnl.toFixed(1)}%
+                      {day.pnl >= 0 ? '+' : ''}{day.pnl.toFixed(1)}%{dollarStr(day.pnl)}
                     </span>
                   </div>
                 </div>
@@ -1219,7 +1220,7 @@ export default function Dashboard() {
                   <p style={{ fontSize: '14px', fontWeight: 700, color: '#4ade80' }}>
                     {MONTHS_SHORT[best.month - 1]} {best.year}
                   </p>
-                  <p style={{ fontSize: '11px', color: '#4ade80' }}>+{best.pnl.toFixed(1)}%</p>
+                  <p style={{ fontSize: '11px', color: '#4ade80' }}>+{best.pnl.toFixed(1)}%{dollarStr(best.pnl)}</p>
                 </div>
               ) : null
             })()}
@@ -1278,7 +1279,7 @@ export default function Dashboard() {
                               }}
                             >
                               <span style={{ fontSize: '11px', fontWeight: 700, color: stat.pnl >= 0 ? '#0A84FF' : '#f87171', lineHeight: 1 }}>
-                                {stat.pnl >= 0 ? '+' : ''}{stat.pnl.toFixed(1)}%
+                                {stat.pnl >= 0 ? '+' : ''}{stat.pnl.toFixed(1)}%{dollarStr(stat.pnl)}
                               </span>
                               <span style={{ fontSize: '10px', color: 'var(--text-muted)', lineHeight: 1 }}>{stat.total} ✦</span>
                             </div>
@@ -1296,7 +1297,7 @@ export default function Dashboard() {
                           minWidth: '52px',
                         }}>
                           <span style={{ fontSize: '12px', fontWeight: 700, color: yearTotal >= 0 ? '#0A84FF' : '#f87171' }}>
-                            {yearTotal >= 0 ? '+' : ''}{yearTotal.toFixed(1)}%
+                            {yearTotal >= 0 ? '+' : ''}{yearTotal.toFixed(1)}%{dollarStr(yearTotal)}
                           </span>
                         </div>
                       </td>
@@ -1407,7 +1408,7 @@ export default function Dashboard() {
                             </p>
                           )}
                           <p style={{ fontSize: '12px', color: d.pnl >= 0 ? '#30D158' : '#f87171', marginTop: '2px' }}>
-                            {d.pnl >= 0 ? '+' : ''}{d.pnl}% P&L
+                            {d.pnl >= 0 ? '+' : ''}{d.pnl}% P&L{dollarStr(d.pnl)}
                           </p>
                         </>
                       )}
@@ -1531,7 +1532,7 @@ export default function Dashboard() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                  {[t.date, t.pair, t.direction, t.rr, t.outcome].map(h => (
+                  {[t.date, t.pair, t.direction, t.rr, 'P&L', t.outcome].map(h => (
                     <th key={h} style={{
                       padding: '10px 16px',
                       textAlign: 'start',
@@ -1571,6 +1572,14 @@ export default function Dashboard() {
                       </td>
                       <td style={{ padding: '11px 16px', fontSize: '13px', color: 'var(--text)' }}>
                         {trade.rr_potential ? `1:${trade.rr_potential}` : '--'}
+                      </td>
+                      <td style={{ padding: '11px 16px', fontSize: '13px', fontWeight: 600 }}>
+                        {(() => {
+                          const pnl = computePnL(trade)
+                          if (pnl === 0 && trade.outcome === 'Open') return <span style={{ color: 'var(--text-muted)' }}>--</span>
+                          const color = pnl > 0 ? '#30D158' : pnl < 0 ? '#FF453A' : 'var(--text-muted)'
+                          return <span style={{ color }}>{pnl >= 0 ? '+' : ''}{pnl.toFixed(2)}%{dollarStr(pnl)}</span>
+                        })()}
                       </td>
                       <td style={{ padding: '11px 16px' }}>
                         <span style={{
