@@ -29,6 +29,8 @@ export function UserSettingsProvider({ children }) {
   const [plan, setPlan] = useState('free')
   const [accountSize, setAccountSize] = useState(10000)
   const [showDollarValues, setShowDollarValues] = useState(false)
+  const [dailyReminder, setDailyReminder] = useState(false)
+  const [reminderTime, setReminderTime] = useState('20:00')
 
   useEffect(() => {
     applyColors(DEFAULT_LONG, DEFAULT_SHORT)
@@ -38,7 +40,7 @@ export function UserSettingsProvider({ children }) {
     if (!user) return
     supabase
       .from('user_settings')
-      .select('long_color, short_color, plan, account_size, show_dollar_values')
+      .select('long_color, short_color, plan, account_size, show_dollar_values, daily_reminder, reminder_time')
       .eq('user_id', user.id)
       .maybeSingle()
       .then(({ data }) => {
@@ -50,6 +52,8 @@ export function UserSettingsProvider({ children }) {
         setPlan(data?.plan || 'free')
         if (data?.account_size != null) setAccountSize(data.account_size)
         if (data?.show_dollar_values != null) setShowDollarValues(data.show_dollar_values)
+        if (data?.daily_reminder != null) setDailyReminder(data.daily_reminder)
+        if (data?.reminder_time) setReminderTime(data.reminder_time)
       })
   }, [user])
 
@@ -60,7 +64,7 @@ export function UserSettingsProvider({ children }) {
   }
 
   return (
-    <UserSettingsContext.Provider value={{ longColor, shortColor, updateColors, plan, accountSize, setAccountSize, showDollarValues, setShowDollarValues }}>
+    <UserSettingsContext.Provider value={{ longColor, shortColor, updateColors, plan, accountSize, setAccountSize, showDollarValues, setShowDollarValues, dailyReminder, setDailyReminder, reminderTime, setReminderTime }}>
       {children}
     </UserSettingsContext.Provider>
   )

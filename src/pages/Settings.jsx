@@ -92,9 +92,12 @@ function SortableItem({ item, onDelete }) {
 export default function Settings() {
   const { user } = useAuth()
   const { t } = useLang()
-  const { updateColors, accountSize: ctxAccountSize, setAccountSize: ctxSetAccountSize, showDollarValues: ctxShowDollar, setShowDollarValues: ctxSetShowDollar } = useUserSettings()
+  const { updateColors, accountSize: ctxAccountSize, setAccountSize: ctxSetAccountSize, showDollarValues: ctxShowDollar, setShowDollarValues: ctxSetShowDollar, dailyReminder: ctxDailyReminder, setDailyReminder: ctxSetDailyReminder, reminderTime: ctxReminderTime, setReminderTime: ctxSetReminderTime } = useUserSettings()
   const [accountSize, setAccountSizeLocal] = useState(ctxAccountSize || 10000)
   const [showDollarValues, setShowDollarValuesLocal] = useState(ctxShowDollar || false)
+  const [dailyReminder, setDailyReminderLocal] = useState(ctxDailyReminder || false)
+  const [reminderTime, setReminderTimeLocal] = useState(ctxReminderTime || '20:00')
+  const [notifPermission, setNotifPermission] = useState(() => typeof Notification !== 'undefined' ? Notification.permission : 'default')
 
   // Confirmations state
   const [confirmations, setConfirmations] = useState([])
@@ -275,6 +278,8 @@ export default function Settings() {
         setSectionOrder(data.settings_section_order)
         localStorage.setItem('settings_section_order', JSON.stringify(data.settings_section_order))
       }
+      if (data.daily_reminder != null) setDailyReminderLocal(data.daily_reminder)
+      if (data.reminder_time) setReminderTimeLocal(data.reminder_time)
     } else {
       setPairs(DEFAULT_PAIRS)
     }
@@ -310,6 +315,8 @@ export default function Settings() {
       long_color: longColor,
       short_color: shortColor,
       exit_modes: exitModes,
+      daily_reminder: dailyReminder,
+      reminder_time: reminderTime,
     }, { onConflict: 'user_id' })
     setSaving(false)
     if (error) {
@@ -319,9 +326,25 @@ export default function Settings() {
       updateColors(longColor, shortColor)
       ctxSetAccountSize(accountSize)
       ctxSetShowDollar(showDollarValues)
+      ctxSetDailyReminder(dailyReminder)
+      ctxSetReminderTime(reminderTime)
+      // sync localStorage for reminder scheduler
+      localStorage.setItem('reminder_enabled', dailyReminder ? '1' : '0')
+      localStorage.setItem('reminder_time', reminderTime)
       setIsDirty(false)
       showToast(t.saved)
     }
+  }
+
+  async function handleToggleReminder() {
+    const next = !dailyReminder
+    if (next && typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      const perm = await Notification.requestPermission()
+      setNotifPermission(perm)
+      if (perm !== 'granted') return
+    }
+    setDailyReminderLocal(next)
+    setIsDirty(true)
   }
 
   // ── Styles ─────────────────────────────────────────────────
@@ -662,6 +685,57 @@ export default function Settings() {
             <p style={{ fontSize: '13px', color: 'var(--text)' }}>Show Dollar Values</p>
             <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Adds ($X) next to % P&L values</p>
           </div>
+        </div>
+      </div>
+
+      {/* ── Daily Reminder ── */}
+      <div style={cardStyle}>
+        <p style={sectionTitle}>Daily Trade Reminder</p>
+        <p style={sectionSub}>Get a browser notification to log your trades if you haven't yet</p>
+        {notifPermission === 'denied' && (
+          <div style={{ background: 'rgba(255,69,58,0.1)', border: '1px solid rgba(255,69,58,0.3)', borderRadius: '8px', padding: '10px 14px', marginBottom: '14px' }}>
+            <p style={{ fontSize: '12px', color: '#FF453A' }}>
+              Notifications are blocked in your browser. Enable them in browser settings to use this feature.
+            </p>
+          </div>
+        )}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <button
+              onClick={handleToggleReminder}
+              disabled={notifPermission === 'denied'}
+              style={{
+                width: '44px', height: '24px', borderRadius: '12px', border: 'none',
+                cursor: notifPermission === 'denied' ? 'not-allowed' : 'pointer',
+                background: dailyReminder ? 'var(--accent)' : 'var(--border-strong)',
+                position: 'relative', transition: 'background 0.2s', flexShrink: 0,
+                opacity: notifPermission === 'denied' ? 0.5 : 1,
+              }}
+            >
+              <span style={{
+                position: 'absolute', top: '3px',
+                left: dailyReminder ? '22px' : '3px',
+                width: '18px', height: '18px', borderRadius: '50%',
+                background: '#fff', transition: 'left 0.2s',
+              }} />
+            </button>
+            <p style={{ fontSize: '13px', color: 'var(--text)' }}>Enable Daily Reminder</p>
+          </div>
+          {dailyReminder && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <p style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text)', minWidth: '80px' }}>Remind me at</p>
+              <input
+                type="time"
+                value={reminderTime}
+                onChange={e => { setReminderTimeLocal(e.target.value); setIsDirty(true) }}
+                style={{
+                  ...inputStyle, maxWidth: '120px',
+                  colorScheme: 'dark',
+                }}
+              />
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Only fires if you have no trades logged today</p>
+            </div>
+          )}
         </div>
       </div>
 
