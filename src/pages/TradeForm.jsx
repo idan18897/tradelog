@@ -360,6 +360,14 @@ export default function TradeForm() {
   const [error, setError] = useState('')
   const [visible, setVisible] = useState(false)
 
+  // Templates
+  const [templates, setTemplates] = useState([])
+  const [showSaveModal, setShowSaveModal] = useState(false)
+  const [templateName, setTemplateName] = useState('')
+  const [templateSaving, setTemplateSaving] = useState(false)
+  const [showLoadDropdown, setShowLoadDropdown] = useState(false)
+  const loadDropdownRef = useRef(null)
+
   const [sectionOrder, setSectionOrder] = useState(() => {
     try { const s = localStorage.getItem('tradeFormSectionOrder'); return s ? JSON.parse(s) : DEFAULT_SECTION_ORDER } catch { return DEFAULT_SECTION_ORDER }
   })
@@ -398,8 +406,18 @@ export default function TradeForm() {
   }, [activeSlot])
 
   useEffect(() => {
+    function handleClickOutside(e) {
+      if (loadDropdownRef.current && !loadDropdownRef.current.contains(e.target)) {
+        setShowLoadDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  useEffect(() => {
     async function init() {
-      await Promise.all([fetchConfirmations(), fetchUserSettings()])
+      await Promise.all([fetchConfirmations(), fetchUserSettings(), fetchTemplates()])
       if (isEditing) await fetchTrade()
       else if (duplicateData) {
         setFormData({
@@ -566,6 +584,57 @@ export default function TradeForm() {
     return urlData.publicUrl
   }
 
+  async function fetchTemplates() {
+    const { data } = await supabase
+      .from('trade_templates')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+    setTemplates(data || [])
+  }
+
+  async function saveTemplate() {
+    if (!templateName.trim()) return
+    setTemplateSaving(true)
+    const data = {
+      pair: formData.pair,
+      direction: formData.direction,
+      confirmations: formData.confirmations,
+      risk_pct: formData.risk_pct,
+      exit_levels: formData.exit_levels,
+      sl_to_be: formData.sl_to_be,
+      be_at: formData.be_at,
+      pot_rr: formData.pot_rr,
+    }
+    const { data: saved, error } = await supabase
+      .from('trade_templates')
+      .insert({ user_id: user.id, name: templateName.trim(), data })
+      .select()
+      .single()
+    setTemplateSaving(false)
+    if (!error && saved) {
+      setTemplates(prev => [saved, ...prev])
+      setShowSaveModal(false)
+      setTemplateName('')
+    }
+  }
+
+  function applyTemplate(template) {
+    const d = template.data
+    setFormData(prev => ({
+      ...prev,
+      pair: d.pair || prev.pair,
+      direction: d.direction || prev.direction,
+      confirmations: d.confirmations || [],
+      risk_pct: d.risk_pct?.toString() || prev.risk_pct,
+      exit_levels: d.exit_levels || [],
+      sl_to_be: d.sl_to_be || false,
+      be_at: d.be_at || 3,
+      pot_rr: d.pot_rr?.toString() || '',
+    }))
+    setShowLoadDropdown(false)
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
@@ -705,29 +774,94 @@ export default function TradeForm() {
       style={{ padding: '28px 32px', maxWidth: '1100px', margin: '0 auto' }}
     >
       {showUpgradeModal && <UpgradeModal onClose={() => setShowUpgradeModal(false)} />}
+      {/* Save Template Modal */}
+      {showSaveModal && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }} onClick={() => setShowSaveModal(false)}>
+          <div style={{
+            background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '16px',
+            padding: '24px', width: '320px', boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
+          }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text)', marginBottom: '6px' }}>Save as Template</h3>
+            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px' }}>
+              Saves: pair, direction, confirmations, risk, exit levels
+            </p>
+            <input
+              autoFocus
+              type="text"
+              placeholder="Template name..."
+              value={templateName}
+              onChange={e => setTemplateName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && saveTemplate()}
+              style={{
+                width: '100%', padding: '10px 12px', borderRadius: '8px', fontSize: '14px',
+                background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)',
+                outline: 'none', boxSizing: 'border-box', marginBottom: '14px',
+              }}
+            />
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={saveTemplate}
+                disabled={!templateName.trim() || templateSaving}
+                style={{
+                  flex: 1, padding: '9px', borderRadius: '8px', fontSize: '14px', fontWeight: 600,
+                  background: 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer',
+                  opacity: !templateName.trim() || templateSaving ? 0.5 : 1,
+                }}
+              >{templateSaving ? 'Saving...' : 'Save'}</button>
+              <button
+                onClick={() => { setShowSaveModal(false); setTemplateName('') }}
+                style={{
+                  flex: 1, padding: '9px', borderRadius: '8px', fontSize: '14px',
+                  background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text-muted)', cursor: 'pointer',
+                }}
+              >Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '22px' }}>
         <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text)' }}>
           {isEditing ? t.editTradeTitle : t.newTradeTitle}
         </h1>
-        <button
-          onClick={() => navigate('/journal')}
-          style={{
-            fontSize: '13px',
-            padding: '7px 14px',
-            borderRadius: '8px',
-            background: 'var(--bg)',
-            border: '1px solid var(--border)',
-            color: 'var(--text-muted)',
-            cursor: 'pointer',
-          }}
-        >
-          {t.cancel}
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {!isEditing && (
+            <button
+              type="button"
+              onClick={() => setShowSaveModal(true)}
+              style={{
+                fontSize: '13px', padding: '7px 14px', borderRadius: '8px',
+                background: 'var(--bg)', border: '1px solid var(--border)',
+                color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--accent)' }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-muted)' }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" />
+              </svg>
+              Save as Template
+            </button>
+          )}
+          <button
+            onClick={() => navigate('/journal')}
+            style={{
+              fontSize: '13px', padding: '7px 14px', borderRadius: '8px',
+              background: 'var(--bg)', border: '1px solid var(--border)',
+              color: 'var(--text-muted)', cursor: 'pointer',
+            }}
+          >
+            {t.cancel}
+          </button>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         {/* Live / Missed toggle */}
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
           {['live', 'missed'].map(type => (
             <button
               key={type}
@@ -756,6 +890,61 @@ export default function TradeForm() {
             </button>
           ))}
         </div>
+
+        {/* Load Template dropdown */}
+        {templates.length > 0 && (
+          <div ref={loadDropdownRef} style={{ position: 'relative', marginBottom: '12px' }}>
+            <button
+              type="button"
+              onClick={() => setShowLoadDropdown(o => !o)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '8px',
+                padding: '9px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: 500,
+                background: showLoadDropdown ? 'var(--card-hover)' : 'var(--bg)',
+                border: '1px solid var(--border)', color: 'var(--text-muted)', cursor: 'pointer',
+                width: '100%', justifyContent: 'space-between',
+              }}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" />
+                </svg>
+                Load Template
+              </span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ transform: showLoadDropdown ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+            {showLoadDropdown && (
+              <div style={{
+                position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0,
+                background: 'var(--card)', border: '1px solid var(--border)',
+                borderRadius: '10px', boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+                zIndex: 100, overflow: 'hidden',
+              }}>
+                {templates.map(tmpl => (
+                  <button
+                    key={tmpl.id}
+                    type="button"
+                    onClick={() => applyTemplate(tmpl)}
+                    style={{
+                      width: '100%', padding: '11px 14px', textAlign: 'left', background: 'none',
+                      border: 'none', borderBottom: '1px solid var(--border)', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--card-hover)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                  >
+                    <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)' }}>{tmpl.name}</span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                      {tmpl.data.pair} · {tmpl.data.direction}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleSectionDragEnd}>
           <SortableContext items={sectionOrder} strategy={verticalListSortingStrategy}>
