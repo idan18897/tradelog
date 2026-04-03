@@ -925,24 +925,6 @@ export default function Dashboard() {
         {/* Separator */}
         <div style={{ width: '1px', height: '24px', background: 'var(--border)' }} />
 
-        {/* Export Report button */}
-        <button
-          onClick={() => setShowReportModal(true)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '6px',
-            padding: '6px 14px', borderRadius: '20px', fontSize: '13px', fontWeight: 600,
-            cursor: 'pointer', border: '1px solid var(--border)',
-            background: 'transparent', color: 'var(--text-muted)', transition: 'all 0.15s',
-          }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--accent)' }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-muted)' }}
-        >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-          </svg>
-          Export Report
-        </button>
-
         {/* Missed trades toggle */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button
@@ -964,6 +946,24 @@ export default function Dashboard() {
             Include Missed
           </span>
         </div>
+
+        {/* Export Report — pushed to right */}
+        <button
+          onClick={() => setShowReportModal(true)}
+          style={{
+            marginInlineStart: 'auto', display: 'flex', alignItems: 'center', gap: '6px',
+            padding: '7px 16px', borderRadius: '20px', fontSize: '13px', fontWeight: 600,
+            cursor: 'pointer', border: '1px solid var(--border)',
+            background: 'var(--bg)', color: 'var(--text-muted)', transition: 'all 0.15s', flexShrink: 0,
+          }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--accent)' }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-muted)' }}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          Export PDF
+        </button>
       </div>
 
       {/* Tab bar */}
