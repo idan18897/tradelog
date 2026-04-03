@@ -430,18 +430,21 @@ export default function Dashboard() {
 
   function generateReport(period) {
     const now = new Date()
-    let from, to
+    let fromStr, toStr, periodLabel
     if (period === 'weekly') {
       const day = now.getDay()
-      from = new Date(now); from.setDate(now.getDate() - day)
-      to = new Date(now)
+      const from = new Date(now); from.setDate(now.getDate() - day)
+      fromStr = from.toISOString().slice(0, 10)
+      toStr = now.toISOString().slice(0, 10)
+      periodLabel = 'Weekly Report'
     } else {
-      from = new Date(now.getFullYear(), now.getMonth(), 1)
-      to = new Date(now)
+      fromStr = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10)
+      toStr = now.toISOString().slice(0, 10)
+      periodLabel = 'Monthly Report'
     }
-    const fromStr = from.toISOString().slice(0, 10)
-    const toStr = to.toISOString().slice(0, 10)
-    const reportTrades = allLiveTrades.filter(tr =>
+    // Use the same already-filtered liveTrades from the dashboard (respects date filter + Include Missed toggle)
+    // Then narrow to the weekly/monthly window and exclude Open/Invalid
+    const reportTrades = liveTrades.filter(tr =>
       tr.date >= fromStr && tr.date <= toStr && !['Open', 'Invalid'].includes(tr.outcome)
     )
     const rClosed = reportTrades.filter(tr => ['TP', 'Partial TP', 'SL', 'BE'].includes(tr.outcome))
@@ -485,11 +488,9 @@ export default function Dashboard() {
     doc.setFontSize(16)
     doc.setFont('helvetica', 'bold')
     doc.text('TradingLog Report', 14, 14)
-    const label = period === 'weekly' ? 'Weekly Report' : 'Monthly Report'
-    const dateLabel = `${fromStr} → ${toStr}`
     doc.setFontSize(10)
     doc.setFont('helvetica', 'normal')
-    doc.text(`${label}  ·  ${dateLabel}`, pageW - 14, 14, { align: 'right' })
+    doc.text(`${periodLabel}  ·  ${fromStr} → ${toStr}`, pageW - 14, 14, { align: 'right' })
 
     // Stats summary
     doc.setTextColor(30, 30, 30)
@@ -606,7 +607,7 @@ export default function Dashboard() {
       doc.text(`TradingLog · Generated ${now.toLocaleDateString()} · Page ${i}/${totalPages}`, pageW / 2, 290, { align: 'center' })
     }
 
-    doc.save(`TradingLog_${label.replace(' ', '_')}_${fromStr}.pdf`)
+    doc.save(`TradingLog_${periodLabel.replace(' ', '_')}_${fromStr}.pdf`)
     setShowReportModal(false)
   }
 
