@@ -59,6 +59,7 @@ export default function Login() {
         navigate('/', { replace: true })
       } else {
         await signup(email, password)
+        localStorage.setItem('show_onboarding', '1')
         setSuccess(t.signupSuccess)
       }
     } catch (err) {

@@ -535,6 +535,28 @@ export default function Dashboard() {
     )
   }
 
+  if (trades.length === 0) {
+    return (
+      <div style={{ minHeight: '80vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 20px', textAlign: 'center' }}>
+        <div style={{ fontSize: '64px', marginBottom: '20px', lineHeight: 1 }}>📈</div>
+        <h2 style={{ fontSize: '22px', fontWeight: 800, color: 'var(--text)', marginBottom: '10px', letterSpacing: '-0.03em' }}>No trades yet</h2>
+        <p style={{ fontSize: '15px', color: 'var(--text-muted)', marginBottom: '28px', maxWidth: '340px', lineHeight: 1.6 }}>
+          Add your first trade to see your stats, equity curve, and performance analytics.
+        </p>
+        <Link
+          to="/new"
+          style={{
+            padding: '12px 28px', borderRadius: '50px', fontSize: '15px', fontWeight: 700,
+            background: 'var(--accent)', color: '#fff', textDecoration: 'none',
+            boxShadow: '0 4px 16px rgba(10,132,255,0.3)',
+          }}
+        >
+          + Add First Trade
+        </Link>
+      </div>
+    )
+  }
+
   return (
     <div
       className={`page-wrap transition-all duration-300 ${visible ? 'fade-in' : 'opacity-0'}`}

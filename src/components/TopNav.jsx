@@ -47,6 +47,7 @@ export default function TopNav() {
   const isMobile = useIsMobile()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const userMenuRef = useRef(null)
+  const [showFirstTip, setShowFirstTip] = useState(() => localStorage.getItem('show_first_trade_tip') === '1')
 
   const navItems = [
     { to: '/', label: t.dashboard, end: true },
@@ -98,6 +99,10 @@ export default function TopNav() {
       @media (min-width: 601px) {
         .topnav-bottom { display: none !important; }
       }
+      @keyframes tooltipPop {
+        from { opacity: 0; transform: translateX(-50%) translateY(-4px); }
+        to { opacity: 1; transform: translateX(-50%) translateY(0); }
+      }
     `}</style>
     <header style={{
       background: 'var(--bg)',
@@ -135,12 +140,37 @@ export default function TopNav() {
             boxShadow: 'var(--shadow)',
           }}>
             {navItems.map(({ to, label, end }) => (
-              <NavLink key={to} to={to} end={end} style={navLinkStyle}
-                onMouseEnter={e => { if (!e.currentTarget.style.boxShadow || e.currentTarget.style.boxShadow === 'none') e.currentTarget.style.color = 'var(--text)' }}
-                onMouseLeave={e => { if (!e.currentTarget.style.boxShadow || e.currentTarget.style.boxShadow === 'none') e.currentTarget.style.color = 'var(--text-muted)' }}
-              >
-                {label}
-              </NavLink>
+              <div key={to} style={{ position: 'relative' }}>
+                <NavLink to={to} end={end} style={navLinkStyle}
+                  onClick={() => {
+                    if (to === '/new' && showFirstTip) {
+                      localStorage.removeItem('show_first_trade_tip')
+                      setShowFirstTip(false)
+                    }
+                  }}
+                  onMouseEnter={e => { if (!e.currentTarget.style.boxShadow || e.currentTarget.style.boxShadow === 'none') e.currentTarget.style.color = 'var(--text)' }}
+                  onMouseLeave={e => { if (!e.currentTarget.style.boxShadow || e.currentTarget.style.boxShadow === 'none') e.currentTarget.style.color = 'var(--text-muted)' }}
+                >
+                  {label}
+                </NavLink>
+                {to === '/new' && showFirstTip && (
+                  <div style={{
+                    position: 'absolute', top: 'calc(100% + 8px)', left: '50%', transform: 'translateX(-50%)',
+                    background: 'var(--accent)', color: '#fff', borderRadius: '8px', padding: '6px 10px',
+                    fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap', pointerEvents: 'none',
+                    boxShadow: '0 4px 12px rgba(10,132,255,0.4)', zIndex: 50,
+                    animation: 'tooltipPop 0.2s ease',
+                  }}>
+                    Start here! →
+                    <div style={{
+                      position: 'absolute', top: '-4px', left: '50%', transform: 'translateX(-50%)',
+                      width: 0, height: 0,
+                      borderLeft: '4px solid transparent', borderRight: '4px solid transparent',
+                      borderBottom: '4px solid var(--accent)',
+                    }} />
+                  </div>
+                )}
+              </div>
             ))}
           </nav>
         )}

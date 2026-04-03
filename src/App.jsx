@@ -12,6 +12,7 @@ import TradeForm from './pages/TradeForm'
 import Settings from './pages/Settings'
 import Landing from './pages/Landing'
 import WelcomeModal from './components/WelcomeModal'
+import OnboardingModal from './components/OnboardingModal'
 import { supabase } from './lib/supabase'
 
 function ReminderScheduler() {
@@ -73,6 +74,11 @@ function ProtectedRoute({ children }) {
 
 function AppRoutes() {
   const [showWelcome, setShowWelcome] = useState(false)
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    const flag = localStorage.getItem('show_onboarding')
+    const done = localStorage.getItem('onboarding_done')
+    return flag === '1' && done !== '1'
+  })
   const [searchParams, setSearchParams] = useSearchParams()
 
   useEffect(() => {
@@ -83,9 +89,15 @@ function AppRoutes() {
     }
   }, [])
 
+  function handleOnboardingClose() {
+    localStorage.removeItem('show_onboarding')
+    setShowOnboarding(false)
+  }
+
   return (
     <>
       <ReminderScheduler />
+      {showOnboarding && <OnboardingModal onClose={handleOnboardingClose} />}
       {showWelcome && <WelcomeModal onClose={() => setShowWelcome(false)} />}
       <Routes>
         <Route path="/landing" element={<Landing />} />
