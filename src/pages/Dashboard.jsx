@@ -63,6 +63,7 @@ export default function Dashboard() {
   const [confFilter, setConfFilter] = useState([]) // empty = all confirmations
   const [comboSize, setComboSize] = useState(2)
   const [minComboTrades, setMinComboTrades] = useState(3)
+  const [comboConfFilter, setComboConfFilter] = useState([]) // filter inside combinations section
   const customRef = useRef(null)
 
   useEffect(() => {
@@ -679,6 +680,7 @@ export default function Dashboard() {
   })
   const comboStats = Object.values(comboMap)
     .filter(c => c.trades >= minComboTrades)
+    .filter(c => comboConfFilter.length === 0 || comboConfFilter.every(f => c.combo.split(' + ').includes(f)))
     .map(c => ({ ...c, winRate: Math.round(c.wins / c.trades * 100), avgRR: c.rrCount ? parseFloat((c.rrSum / c.rrCount).toFixed(2)) : 0, pnl: parseFloat(c.pnl.toFixed(2)) }))
     .sort((a, b) => b.winRate - a.winRate)
     .slice(0, 20)
@@ -1169,6 +1171,35 @@ export default function Dashboard() {
                       />
                     </div>
                   </div>
+                </div>
+
+                {/* Confirmation filter inside combinations */}
+                <div style={{ padding: '10px 18px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', background: 'rgba(128,128,128,0.03)' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Must include:</span>
+                  <button
+                    onClick={() => setComboConfFilter([])}
+                    style={{
+                      padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', border: '1px solid',
+                      background: comboConfFilter.length === 0 ? 'var(--accent)' : 'transparent',
+                      color: comboConfFilter.length === 0 ? '#fff' : 'var(--text-muted)',
+                      borderColor: comboConfFilter.length === 0 ? 'var(--accent)' : 'var(--border)',
+                    }}
+                  >All</button>
+                  {allConfNames.map(name => {
+                    const active = comboConfFilter.includes(name)
+                    return (
+                      <button
+                        key={name}
+                        onClick={() => setComboConfFilter(prev => active ? prev.filter(x => x !== name) : [...prev, name])}
+                        style={{
+                          padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', border: '1px solid',
+                          background: active ? 'rgba(96,165,250,0.18)' : 'transparent',
+                          color: active ? '#60a5fa' : 'var(--text-muted)',
+                          borderColor: active ? '#60a5fa' : 'var(--border)',
+                        }}
+                      >{name}</button>
+                    )
+                  })}
                 </div>
 
                 {/* Best Combo highlight */}
