@@ -60,6 +60,13 @@ export default function Dashboard() {
   const [hourView, setHourView] = useState('winRate') // 'winRate' | 'volume'
   const [dashTab, setDashTab] = useState('overview') // 'overview' | 'confirmations'
   const [showReportModal, setShowReportModal] = useState(false)
+  const [reportType, setReportType] = useState('weekly')
+  const [reportWeekOf, setReportWeekOf] = useState(() => {
+    const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+  })
+  const [reportMonthOf, setReportMonthOf] = useState(() => {
+    const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`
+  })
   const [confFilter, setConfFilter] = useState([]) // empty = all confirmations
   const [comboSize, setComboSize] = useState(2)
   const [minComboTrades, setMinComboTrades] = useState(3)
@@ -432,22 +439,24 @@ export default function Dashboard() {
   const grossLoss = slTrades.reduce((s, tr) => s + Math.abs(computePnL(tr)), 0)
   const profitFactor = grossLoss > 0 ? parseFloat((grossProfit / grossLoss).toFixed(2)) : null
 
-  function generateReport(period) {
-    const now = new Date()
+  function generateReport() {
     function localStr(d) {
       return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
     }
     let fromStr, toStr, periodLabel
-    if (period === 'weekly') {
-      const day = now.getDay() === 0 ? 7 : now.getDay() // treat Sunday as end of week (Mon-Sun)
-      const from = new Date(now); from.setDate(now.getDate() - (day - 1))
+    if (reportType === 'weekly') {
+      const anchor = new Date(reportWeekOf + 'T12:00:00')
+      const day = anchor.getDay() === 0 ? 7 : anchor.getDay()
+      const from = new Date(anchor); from.setDate(anchor.getDate() - (day - 1))
+      const to = new Date(from); to.setDate(from.getDate() + 6)
       fromStr = localStr(from)
-      toStr = localStr(now)
-      periodLabel = 'Weekly Report'
+      toStr = localStr(to)
+      periodLabel = `Week of ${fromStr}`
     } else {
-      fromStr = localStr(new Date(now.getFullYear(), now.getMonth(), 1))
-      toStr = localStr(now)
-      periodLabel = 'Monthly Report'
+      const [yr, mo] = reportMonthOf.split('-').map(Number)
+      fromStr = localStr(new Date(yr, mo - 1, 1))
+      toStr = localStr(new Date(yr, mo, 0)) // last day of month
+      periodLabel = new Date(yr, mo - 1, 1).toLocaleString('default', { month: 'long', year: 'numeric' })
     }
     // Use full unfiltered source (ignore dashboard date filter) — always show the actual report period
     const reportTrades = [
@@ -841,36 +850,63 @@ export default function Dashboard() {
           onClick={() => setShowReportModal(false)}
         >
           <div
-            style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '20px', padding: '28px', width: '320px', boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}
+            style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '20px', padding: '28px', width: '340px', boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}
             onClick={e => e.stopPropagation()}
           >
-            <h3 style={{ fontSize: '17px', fontWeight: 700, color: 'var(--text)', marginBottom: '6px' }}>Export Report</h3>
-            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '20px' }}>Generate a PDF with stats and trade list for the selected period</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {[
-                { key: 'weekly', label: '📅 Weekly Report', sub: "This week's trades" },
-                { key: 'monthly', label: '📆 Monthly Report', sub: "This month's trades" },
-              ].map(({ key, label, sub }) => (
-                <button
-                  key={key}
-                  onClick={() => generateReport(key)}
-                  style={{
-                    padding: '14px 16px', borderRadius: '12px', textAlign: 'left', cursor: 'pointer',
-                    border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)',
-                    display: 'flex', flexDirection: 'column', gap: '3px', transition: 'all 0.15s',
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.background = 'var(--card-hover)' }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--bg)' }}
-                >
-                  <span style={{ fontSize: '14px', fontWeight: 600 }}>{label}</span>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{sub}</span>
-                </button>
+            <h3 style={{ fontSize: '17px', fontWeight: 700, color: 'var(--text)', marginBottom: '4px' }}>Export PDF Report</h3>
+            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '20px' }}>בחר תקופה וייצא דוח עם סטטיסטיקות ורשימת טריידים</p>
+
+            {/* Type toggle */}
+            <div style={{ display: 'flex', background: 'var(--bg)', borderRadius: '10px', padding: '3px', marginBottom: '20px', border: '1px solid var(--border)' }}>
+              {[{ key: 'weekly', label: '📅 שבועי' }, { key: 'monthly', label: '📆 חודשי' }].map(({ key, label }) => (
+                <button key={key} onClick={() => setReportType(key)} style={{
+                  flex: 1, padding: '8px', borderRadius: '7px', fontSize: '13px', fontWeight: 600,
+                  border: 'none', cursor: 'pointer', transition: 'all 0.15s',
+                  background: reportType === key ? 'var(--btn-primary-bg)' : 'transparent',
+                  color: reportType === key ? 'var(--btn-primary-color)' : 'var(--text-muted)',
+                }}>{label}</button>
               ))}
             </div>
+
+            {/* Date picker */}
+            <div style={{ marginBottom: '22px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                {reportType === 'weekly' ? 'בחר שבוע (כל תאריך בתוך השבוע)' : 'בחר חודש'}
+              </label>
+              {reportType === 'weekly' ? (
+                <input
+                  type="date"
+                  value={reportWeekOf}
+                  onChange={e => setReportWeekOf(e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: '14px', boxSizing: 'border-box' }}
+                />
+              ) : (
+                <input
+                  type="month"
+                  value={reportMonthOf}
+                  onChange={e => setReportMonthOf(e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: '14px', boxSizing: 'border-box' }}
+                />
+              )}
+            </div>
+
+            {/* Generate button */}
+            <button
+              onClick={generateReport}
+              style={{
+                width: '100%', padding: '12px', borderRadius: '12px', fontSize: '14px', fontWeight: 700,
+                border: 'none', cursor: 'pointer', background: 'var(--accent)', color: '#fff',
+                marginBottom: '10px', transition: 'opacity 0.15s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
+              onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+            >
+              ייצא PDF ↓
+            </button>
             <button
               onClick={() => setShowReportModal(false)}
-              style={{ marginTop: '14px', width: '100%', padding: '9px', borderRadius: '10px', background: 'none', border: '1px solid var(--border)', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '13px' }}
-            >Cancel</button>
+              style={{ width: '100%', padding: '9px', borderRadius: '10px', background: 'none', border: '1px solid var(--border)', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '13px' }}
+            >ביטול</button>
           </div>
         </div>
       )}
