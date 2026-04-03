@@ -60,6 +60,9 @@ export default function Dashboard() {
   const [hourView, setHourView] = useState('winRate') // 'winRate' | 'volume'
   const [dashTab, setDashTab] = useState('overview') // 'overview' | 'confirmations'
   const [showReportModal, setShowReportModal] = useState(false)
+  const [confFilter, setConfFilter] = useState([]) // empty = all confirmations
+  const [comboSize, setComboSize] = useState(2)
+  const [minComboTrades, setMinComboTrades] = useState(3)
   const customRef = useRef(null)
 
   useEffect(() => {
@@ -430,21 +433,26 @@ export default function Dashboard() {
 
   function generateReport(period) {
     const now = new Date()
+    function localStr(d) {
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+    }
     let fromStr, toStr, periodLabel
     if (period === 'weekly') {
-      const day = now.getDay()
-      const from = new Date(now); from.setDate(now.getDate() - day)
-      fromStr = from.toISOString().slice(0, 10)
-      toStr = now.toISOString().slice(0, 10)
+      const day = now.getDay() === 0 ? 7 : now.getDay() // treat Sunday as end of week (Mon-Sun)
+      const from = new Date(now); from.setDate(now.getDate() - (day - 1))
+      fromStr = localStr(from)
+      toStr = localStr(now)
       periodLabel = 'Weekly Report'
     } else {
-      fromStr = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10)
-      toStr = now.toISOString().slice(0, 10)
+      fromStr = localStr(new Date(now.getFullYear(), now.getMonth(), 1))
+      toStr = localStr(now)
       periodLabel = 'Monthly Report'
     }
-    // Use the same already-filtered liveTrades from the dashboard (respects date filter + Include Missed toggle)
-    // Then narrow to the weekly/monthly window and exclude Open/Invalid
-    const reportTrades = liveTrades.filter(tr =>
+    // Use full unfiltered source (ignore dashboard date filter) — always show the actual report period
+    const reportTrades = [
+      ...allLiveTrades,
+      ...(showMissed ? allMissedTrades : []),
+    ].filter(tr =>
       tr.date >= fromStr && tr.date <= toStr && !['Open', 'Invalid'].includes(tr.outcome)
     )
     const rClosed = reportTrades.filter(tr => ['TP', 'Partial TP', 'SL', 'BE'].includes(tr.outcome))
@@ -616,6 +624,10 @@ export default function Dashboard() {
     ['TP', 'Partial TP', 'SL', 'BE'].includes(tr.outcome) &&
     Array.isArray(tr.confirmations) && tr.confirmations.length > 0
   )
+
+  // All unique confirmation names (for filter UI)
+  const allConfNames = [...new Set(confTrades.flatMap(tr => tr.confirmations))].sort()
+
   const confMap = {}
   confTrades.forEach(tr => {
     const pnl = computePnL(tr)
@@ -631,27 +643,72 @@ export default function Dashboard() {
     .map(c => ({ ...c, winRate: Math.round(c.wins / c.trades * 100), avgRR: c.rrCount ? parseFloat((c.rrSum / c.rrCount).toFixed(2)) : 0, pnl: parseFloat(c.pnl.toFixed(2)) }))
     .sort((a, b) => b.pnl - a.pnl)
 
-  // Combinations (2-conf pairs)
+  // Filtered confStats (based on multi-select filter)
+  const filteredConfStats = confFilter.length === 0 ? confStats : confStats.filter(c => confFilter.includes(c.name))
+
+  // Generic combinations helper
+  function getCombinations(arr, size) {
+    if (size === 1) return arr.map(x => [x])
+    const result = []
+    for (let i = 0; i <= arr.length - size; i++) {
+      getCombinations(arr.slice(i + 1), size - 1).forEach(rest => result.push([arr[i], ...rest]))
+    }
+    return result
+  }
+
+  // Combinations (size 2/3/4, filtered)
   const comboMap = {}
   confTrades.forEach(tr => {
-    const confs = [...tr.confirmations].sort()
+    const trConfs = (confFilter.length === 0
+      ? [...tr.confirmations]
+      : tr.confirmations.filter(c => confFilter.includes(c))
+    ).sort()
+    if (trConfs.length < comboSize) return
     const pnl = computePnL(tr)
     const isWin = tr.outcome === 'TP' || tr.outcome === 'Partial TP'
-    for (let i = 0; i < confs.length; i++) {
-      for (let j = i + 1; j < confs.length; j++) {
-        const key = `${confs[i]} + ${confs[j]}`
-        if (!comboMap[key]) comboMap[key] = { combo: key, trades: 0, wins: 0, pnl: 0 }
-        comboMap[key].trades++
-        if (isWin) comboMap[key].wins++
-        comboMap[key].pnl += pnl
+    getCombinations(trConfs, comboSize).forEach(combo => {
+      const key = combo.join(' + ')
+      if (!comboMap[key]) comboMap[key] = { combo: key, trades: 0, wins: 0, pnl: 0, rrSum: 0, rrCount: 0 }
+      comboMap[key].trades++
+      if (isWin) {
+        comboMap[key].wins++
+        if (tr.rr_potential) { comboMap[key].rrSum += tr.rr_potential; comboMap[key].rrCount++ }
       }
-    }
+      comboMap[key].pnl += pnl
+    })
   })
   const comboStats = Object.values(comboMap)
-    .filter(c => c.trades >= 2)
-    .map(c => ({ ...c, winRate: Math.round(c.wins / c.trades * 100), pnl: parseFloat(c.pnl.toFixed(2)) }))
-    .sort((a, b) => b.pnl - a.pnl)
-    .slice(0, 15)
+    .filter(c => c.trades >= minComboTrades)
+    .map(c => ({ ...c, winRate: Math.round(c.wins / c.trades * 100), avgRR: c.rrCount ? parseFloat((c.rrSum / c.rrCount).toFixed(2)) : 0, pnl: parseFloat(c.pnl.toFixed(2)) }))
+    .sort((a, b) => b.winRate - a.winRate)
+    .slice(0, 20)
+
+  // Best combo: highest score = winRate% × avgRR
+  const bestCombo = comboStats.length > 0
+    ? comboStats.reduce((best, c) => {
+        const score = (c.winRate / 100) * (c.avgRR || 1)
+        const bScore = (best.winRate / 100) * (best.avgRR || 1)
+        return score > bScore ? c : best
+      }, comboStats[0])
+    : null
+
+  // Heatmap: confirmation × day of week
+  const heatmapDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
+  const heatmapData = {}
+  confTrades.forEach(tr => {
+    if (!tr.date) return
+    const dow = new Date(tr.date + 'T12:00:00').getDay() // 0=Sun
+    const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dow]
+    if (!heatmapDays.includes(dayName)) return
+    const isWin = tr.outcome === 'TP' || tr.outcome === 'Partial TP'
+    const confsToProcess = confFilter.length === 0 ? tr.confirmations : tr.confirmations.filter(c => confFilter.includes(c))
+    confsToProcess.forEach(c => {
+      if (!heatmapData[c]) heatmapData[c] = {}
+      if (!heatmapData[c][dayName]) heatmapData[c][dayName] = { wins: 0, trades: 0 }
+      heatmapData[c][dayName].trades++
+      if (isWin) heatmapData[c][dayName].wins++
+    })
+  })
 
   const statCards = [
     {
@@ -990,12 +1047,43 @@ export default function Dashboard() {
             </div>
           ) : (
             <>
+              {/* Multi-select filter */}
+              <div style={{ ...cardStyle, padding: '14px 18px', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginRight: '4px', whiteSpace: 'nowrap' }}>Filter:</span>
+                  <button
+                    onClick={() => setConfFilter([])}
+                    style={{
+                      padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: '1px solid',
+                      background: confFilter.length === 0 ? 'var(--accent)' : 'transparent',
+                      color: confFilter.length === 0 ? '#fff' : 'var(--text-muted)',
+                      borderColor: confFilter.length === 0 ? 'var(--accent)' : 'var(--border)',
+                    }}
+                  >All</button>
+                  {allConfNames.map(name => {
+                    const active = confFilter.includes(name)
+                    return (
+                      <button
+                        key={name}
+                        onClick={() => setConfFilter(prev => active ? prev.filter(x => x !== name) : [...prev, name])}
+                        style={{
+                          padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: '1px solid',
+                          background: active ? 'rgba(96,165,250,0.18)' : 'transparent',
+                          color: active ? '#60a5fa' : 'var(--text-muted)',
+                          borderColor: active ? '#60a5fa' : 'var(--border)',
+                        }}
+                      >{name}</button>
+                    )
+                  })}
+                </div>
+              </div>
+
               {/* Bar chart — top confirmations by P&L */}
               <div style={{ ...cardStyle, padding: '20px', marginBottom: '20px' }}>
                 <h2 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', marginBottom: '4px' }}>Confirmations by P&L</h2>
                 <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px' }}>Which confirmations generate the most profit</p>
                 <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={confStats.slice(0, 12)} margin={{ top: 5, right: 10, left: -10, bottom: 40 }}>
+                  <BarChart data={filteredConfStats.slice(0, 12)} margin={{ top: 5, right: 10, left: -10, bottom: 40 }}>
                     <XAxis dataKey="name" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} axisLine={false} tickLine={false} angle={-35} textAnchor="end" interval={0} />
                     <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `${v > 0 ? '+' : ''}${v}%`} />
                     <Tooltip content={({ active, payload }) => {
@@ -1011,7 +1099,7 @@ export default function Dashboard() {
                       )
                     }} cursor={{ fill: 'rgba(128,128,128,0.06)' }} />
                     <Bar dataKey="pnl" radius={[4, 4, 0, 0]} maxBarSize={48}>
-                      {confStats.slice(0, 12).map((c, i) => (
+                      {filteredConfStats.slice(0, 12).map((c, i) => (
                         <Cell key={i} fill={c.pnl >= 0 ? '#4ade80' : '#f87171'} opacity={0.85} />
                       ))}
                     </Bar>
@@ -1034,7 +1122,7 @@ export default function Dashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {confStats.map((c, i) => (
+                      {filteredConfStats.map((c, i) => (
                         <tr key={c.name} style={{ borderBottom: '1px solid var(--border)', background: i % 2 === 0 ? 'transparent' : 'rgba(128,128,128,0.03)' }}>
                           <td style={{ padding: '12px 16px', fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>{c.name}</td>
                           <td style={{ padding: '12px 16px', fontSize: '13px', color: 'var(--text-muted)', textAlign: 'right' }}>{c.trades}</td>
@@ -1052,40 +1140,160 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* Combinations table */}
-              {comboStats.length > 0 && (
-                <div style={{ ...cardStyle, overflow: 'hidden' }}>
-                  <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--border)' }}>
-                    <h2 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', marginBottom: '2px' }}>Best Combinations</h2>
-                    <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Pairs of confirmations that appear together (min. 2 trades)</p>
+              {/* Combinations Analysis */}
+              <div style={{ ...cardStyle, overflow: 'hidden', marginBottom: '20px' }}>
+                <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+                  <div>
+                    <h2 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', marginBottom: '2px' }}>Combinations Analysis</h2>
+                    <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Confirmations that appear together, sorted by win rate</p>
                   </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginInlineStart: 'auto', flexWrap: 'wrap' }}>
+                    {/* Combo size toggle */}
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      {[2, 3, 4].map(n => (
+                        <button key={n} onClick={() => setComboSize(n)} style={{
+                          padding: '4px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: '1px solid',
+                          background: comboSize === n ? 'var(--accent)' : 'transparent',
+                          color: comboSize === n ? '#fff' : 'var(--text-muted)',
+                          borderColor: comboSize === n ? 'var(--accent)' : 'var(--border)',
+                        }}>{n} confs</button>
+                      ))}
+                    </div>
+                    {/* Min trades */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Min trades:</span>
+                      <input
+                        type="number" min={1} max={20} value={minComboTrades}
+                        onChange={e => setMinComboTrades(Math.max(1, parseInt(e.target.value) || 1))}
+                        style={{ width: '52px', padding: '4px 8px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: '12px', fontWeight: 600, textAlign: 'center' }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Best Combo highlight */}
+                {bestCombo && (
+                  <div style={{ padding: '12px 18px', background: 'rgba(250,204,21,0.06)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '13px' }}>🏆</span>
+                    <div>
+                      <p style={{ fontSize: '11px', fontWeight: 600, color: '#facc15', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '3px' }}>Best Combo</p>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                        {bestCombo.combo.split(' + ').map((tag, idx, arr) => (
+                          <span key={idx}>
+                            <span style={{ background: 'rgba(250,204,21,0.15)', color: '#facc15', borderRadius: '6px', padding: '2px 8px', fontSize: '12px', fontWeight: 700 }}>{tag}</span>
+                            {idx < arr.length - 1 && <span style={{ color: 'var(--text-muted)', margin: '0 2px' }}>+</span>}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '18px', marginInlineStart: 'auto', flexWrap: 'wrap' }}>
+                      <div style={{ textAlign: 'center' }}>
+                        <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '1px' }}>Win Rate</p>
+                        <p style={{ fontSize: '15px', fontWeight: 700, color: '#4ade80' }}>{bestCombo.winRate}%</p>
+                      </div>
+                      <div style={{ textAlign: 'center' }}>
+                        <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '1px' }}>Avg R:R</p>
+                        <p style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)' }}>1:{bestCombo.avgRR || '--'}</p>
+                      </div>
+                      <div style={{ textAlign: 'center' }}>
+                        <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '1px' }}>Trades</p>
+                        <p style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)' }}>{bestCombo.trades}</p>
+                      </div>
+                      <div style={{ textAlign: 'center' }}>
+                        <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '1px' }}>P&L</p>
+                        <p style={{ fontSize: '15px', fontWeight: 700, color: bestCombo.pnl >= 0 ? '#4ade80' : '#f87171' }}>{bestCombo.pnl >= 0 ? '+' : ''}{bestCombo.pnl}%</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {comboStats.length === 0 ? (
+                  <div style={{ padding: '28px', textAlign: 'center' }}>
+                    <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>No combinations found with {comboSize} confirmations and min. {minComboTrades} trades.</p>
+                  </div>
+                ) : (
                   <div style={{ overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                       <thead>
                         <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                          {['Combination', 'Trades', 'Win Rate', 'Total P&L'].map(h => (
+                          {['Combination', 'Trades', 'Win Rate', 'Avg R:R', 'Total P&L'].map(h => (
                             <th key={h} style={{ padding: '10px 16px', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textAlign: h === 'Combination' ? 'left' : 'right', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
-                        {comboStats.map((c, i) => (
-                          <tr key={c.combo} style={{ borderBottom: '1px solid var(--border)', background: i % 2 === 0 ? 'transparent' : 'rgba(128,128,128,0.03)' }}>
-                            <td style={{ padding: '12px 16px', fontSize: '13px', fontWeight: 500, color: 'var(--text)' }}>
-                              {c.combo.split(' + ').map((tag, idx) => (
-                                <span key={idx}>
-                                  <span style={{ background: 'rgba(96,165,250,0.12)', color: '#60a5fa', borderRadius: '6px', padding: '2px 8px', fontSize: '12px', fontWeight: 600 }}>{tag}</span>
-                                  {idx < c.combo.split(' + ').length - 1 && <span style={{ color: 'var(--text-muted)', margin: '0 4px' }}>+</span>}
-                                </span>
-                              ))}
-                            </td>
-                            <td style={{ padding: '12px 16px', fontSize: '13px', color: 'var(--text-muted)', textAlign: 'right' }}>{c.trades}</td>
-                            <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                              <span style={{ fontSize: '13px', fontWeight: 600, color: c.winRate >= 60 ? '#4ade80' : c.winRate >= 45 ? '#f59e0b' : '#f87171' }}>{c.winRate}%</span>
-                            </td>
-                            <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                              <span style={{ fontSize: '13px', fontWeight: 700, color: c.pnl >= 0 ? '#4ade80' : '#f87171' }}>{c.pnl >= 0 ? '+' : ''}{c.pnl}%{dollarStr(c.pnl)}</span>
-                            </td>
+                        {comboStats.map((c, i) => {
+                          const isBest = bestCombo && c.combo === bestCombo.combo
+                          return (
+                            <tr key={c.combo} style={{ borderBottom: '1px solid var(--border)', background: isBest ? 'rgba(250,204,21,0.04)' : i % 2 === 0 ? 'transparent' : 'rgba(128,128,128,0.03)' }}>
+                              <td style={{ padding: '12px 16px', fontSize: '13px', fontWeight: 500, color: 'var(--text)' }}>
+                                {isBest && <span style={{ marginRight: '6px' }}>🏆</span>}
+                                {c.combo.split(' + ').map((tag, idx, arr) => (
+                                  <span key={idx}>
+                                    <span style={{ background: 'rgba(96,165,250,0.12)', color: '#60a5fa', borderRadius: '6px', padding: '2px 8px', fontSize: '12px', fontWeight: 600 }}>{tag}</span>
+                                    {idx < arr.length - 1 && <span style={{ color: 'var(--text-muted)', margin: '0 4px' }}>+</span>}
+                                  </span>
+                                ))}
+                              </td>
+                              <td style={{ padding: '12px 16px', fontSize: '13px', color: 'var(--text-muted)', textAlign: 'right' }}>{c.trades}</td>
+                              <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                                <span style={{ fontSize: '13px', fontWeight: 600, color: c.winRate >= 60 ? '#4ade80' : c.winRate >= 45 ? '#f59e0b' : '#f87171' }}>{c.winRate}%</span>
+                              </td>
+                              <td style={{ padding: '12px 16px', fontSize: '13px', color: 'var(--text)', textAlign: 'right' }}>1:{c.avgRR || '--'}</td>
+                              <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                                <span style={{ fontSize: '13px', fontWeight: 700, color: c.pnl >= 0 ? '#4ade80' : '#f87171' }}>{c.pnl >= 0 ? '+' : ''}{c.pnl}%{dollarStr(c.pnl)}</span>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Confirmation × Day Heatmap */}
+              {Object.keys(heatmapData).length > 0 && (
+                <div style={{ ...cardStyle, overflow: 'hidden' }}>
+                  <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--border)' }}>
+                    <h2 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', marginBottom: '2px' }}>Confirmation × Day Heatmap</h2>
+                    <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Win rate per confirmation by day of week</p>
+                  </div>
+                  <div style={{ overflowX: 'auto', padding: '16px 18px' }}>
+                    <table style={{ borderCollapse: 'separate', borderSpacing: '4px' }}>
+                      <thead>
+                        <tr>
+                          <th style={{ padding: '4px 8px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'left', minWidth: '90px' }}></th>
+                          {heatmapDays.map(d => (
+                            <th key={d} style={{ padding: '4px 8px', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textAlign: 'center', minWidth: '60px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{d}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.keys(heatmapData).sort().map(conf => (
+                          <tr key={conf}>
+                            <td style={{ padding: '4px 8px', fontSize: '12px', fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap' }}>{conf}</td>
+                            {heatmapDays.map(day => {
+                              const cell = heatmapData[conf]?.[day]
+                              if (!cell || cell.trades === 0) {
+                                return <td key={day} style={{ padding: '6px 8px', textAlign: 'center', borderRadius: '6px', background: 'var(--bg-secondary)', fontSize: '11px', color: 'var(--text-subtle)' }}>–</td>
+                              }
+                              const wr = Math.round(cell.wins / cell.trades * 100)
+                              const intensity = wr / 100
+                              const bg = wr >= 60
+                                ? `rgba(74,222,128,${0.1 + intensity * 0.5})`
+                                : wr >= 40
+                                  ? `rgba(250,204,21,${0.1 + intensity * 0.3})`
+                                  : `rgba(248,113,113,${0.1 + (1 - intensity) * 0.4})`
+                              const textColor = wr >= 60 ? '#4ade80' : wr >= 40 ? '#facc15' : '#f87171'
+                              return (
+                                <td key={day} title={`${cell.trades} trades`} style={{ padding: '6px 8px', textAlign: 'center', borderRadius: '6px', background: bg, cursor: 'default' }}>
+                                  <span style={{ fontSize: '12px', fontWeight: 700, color: textColor }}>{wr}%</span>
+                                  <br />
+                                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{cell.trades}t</span>
+                                </td>
+                              )
+                            })}
                           </tr>
                         ))}
                       </tbody>
