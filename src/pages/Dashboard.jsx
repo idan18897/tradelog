@@ -773,11 +773,8 @@ export default function Dashboard() {
   }
 
   return (
-    <div
-      className={`page-wrap transition-all duration-300 ${visible ? 'fade-in' : 'opacity-0'}`}
-      style={{ padding: '28px 32px', maxWidth: '1400px', margin: '0 auto' }}
-    >
-      {/* Report Modal */}
+    <>
+      {/* Report Modal — outside page-wrap to avoid transform clipping position:fixed */}
       {showReportModal && (
         <div
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
@@ -791,8 +788,8 @@ export default function Dashboard() {
             <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '20px' }}>Generate a PDF with stats and trade list for the selected period</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {[
-                { key: 'weekly', label: '📅 Weekly Report', sub: 'This week\'s trades' },
-                { key: 'monthly', label: '📆 Monthly Report', sub: 'This month\'s trades' },
+                { key: 'weekly', label: '📅 Weekly Report', sub: "This week's trades" },
+                { key: 'monthly', label: '📆 Monthly Report', sub: "This month's trades" },
               ].map(({ key, label, sub }) => (
                 <button
                   key={key}
@@ -818,6 +815,10 @@ export default function Dashboard() {
         </div>
       )}
 
+    <div
+      className={`page-wrap transition-all duration-300 ${visible ? 'fade-in' : 'opacity-0'}`}
+      style={{ padding: '28px 32px', maxWidth: '1400px', margin: '0 auto' }}
+    >
       {/* ── Time Filter Bar ── */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', marginBottom: '20px' }}>
         <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text)', marginRight: '8px', letterSpacing: '-0.03em' }}>
@@ -1933,5 +1934,6 @@ export default function Dashboard() {
       </div>
       </> }
     </div>
+    </>
   )
 }
