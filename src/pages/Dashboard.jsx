@@ -1286,49 +1286,88 @@ export default function Dashboard() {
               {/* Confirmation × Day Heatmap */}
               {Object.keys(heatmapData).length > 0 && (
                 <div style={{ ...cardStyle, overflow: 'hidden' }}>
-                  <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--border)' }}>
-                    <h2 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', marginBottom: '2px' }}>Confirmation × Day Heatmap</h2>
-                    <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Win rate per confirmation by day of week</p>
+                  {/* Header */}
+                  <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                    <div>
+                      <h2 style={{ fontSize: '15px', fontWeight: 650, color: 'var(--text)', marginBottom: '3px', letterSpacing: '-0.01em' }}>Confirmation × Day</h2>
+                      <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Win rate per confirmation by day of week</p>
+                    </div>
+                    {/* Legend */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      {[['#30D158', 'High (≥60%)'], ['#FF9F0A', 'Mid (40–60%)'], ['#FF453A', 'Low (<40%)']].map(([color, label]) => (
+                        <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: color, opacity: 0.7 }} />
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{label}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <div style={{ overflowX: 'auto', padding: '16px 18px' }}>
-                    <table style={{ borderCollapse: 'separate', borderSpacing: '4px' }}>
-                      <thead>
-                        <tr>
-                          <th style={{ padding: '4px 8px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'left', minWidth: '90px' }}></th>
-                          {heatmapDays.map(d => (
-                            <th key={d} style={{ padding: '4px 8px', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textAlign: 'center', minWidth: '60px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{d}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {Object.keys(heatmapData).sort().map(conf => (
-                          <tr key={conf}>
-                            <td style={{ padding: '4px 8px', fontSize: '12px', fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap' }}>{conf}</td>
-                            {heatmapDays.map(day => {
-                              const cell = heatmapData[conf]?.[day]
-                              if (!cell || cell.trades === 0) {
-                                return <td key={day} style={{ padding: '6px 8px', textAlign: 'center', borderRadius: '6px', background: 'var(--bg-secondary)', fontSize: '11px', color: 'var(--text-subtle)' }}>–</td>
-                              }
-                              const wr = Math.round(cell.wins / cell.trades * 100)
-                              const intensity = wr / 100
-                              const bg = wr >= 60
-                                ? `rgba(74,222,128,${0.1 + intensity * 0.5})`
-                                : wr >= 40
-                                  ? `rgba(250,204,21,${0.1 + intensity * 0.3})`
-                                  : `rgba(248,113,113,${0.1 + (1 - intensity) * 0.4})`
-                              const textColor = wr >= 60 ? '#4ade80' : wr >= 40 ? '#facc15' : '#f87171'
+
+                  {/* Grid */}
+                  <div style={{ overflowX: 'auto', padding: '20px 24px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: `180px repeat(5, 1fr)`, gap: '6px', minWidth: '520px' }}>
+                      {/* Header row */}
+                      <div />
+                      {heatmapDays.map(d => (
+                        <div key={d} style={{ textAlign: 'center', padding: '6px 0', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{d}</div>
+                      ))}
+
+                      {/* Data rows */}
+                      {Object.keys(heatmapData).sort().map((conf, ri) => {
+                        const totalTrades = heatmapDays.reduce((s, d) => s + (heatmapData[conf]?.[d]?.trades || 0), 0)
+                        const totalWins = heatmapDays.reduce((s, d) => s + (heatmapData[conf]?.[d]?.wins || 0), 0)
+                        const overallWR = totalTrades > 0 ? Math.round(totalWins / totalTrades * 100) : null
+                        return [
+                          // Label cell
+                          <div key={`${conf}-label`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 10px 0 0', minHeight: '52px' }}>
+                            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '130px' }}>{conf}</span>
+                            {overallWR !== null && (
+                              <span style={{ fontSize: '11px', fontWeight: 700, color: overallWR >= 60 ? '#30D158' : overallWR >= 40 ? '#FF9F0A' : '#FF453A', flexShrink: 0 }}>{overallWR}%</span>
+                            )}
+                          </div>,
+                          // Day cells
+                          ...heatmapDays.map(day => {
+                            const cell = heatmapData[conf]?.[day]
+                            if (!cell || cell.trades === 0) {
                               return (
-                                <td key={day} title={`${cell.trades} trades`} style={{ padding: '6px 8px', textAlign: 'center', borderRadius: '6px', background: bg, cursor: 'default' }}>
-                                  <span style={{ fontSize: '12px', fontWeight: 700, color: textColor }}>{wr}%</span>
-                                  <br />
-                                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{cell.trades}t</span>
-                                </td>
+                                <div key={`${conf}-${day}`} style={{
+                                  borderRadius: '10px', background: 'var(--bg-secondary)',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  minHeight: '52px', opacity: 0.4,
+                                }}>
+                                  <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>–</span>
+                                </div>
                               )
-                            })}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                            }
+                            const wr = Math.round(cell.wins / cell.trades * 100)
+                            const isGreen = wr >= 60
+                            const isYellow = wr >= 40 && wr < 60
+                            const bgColor = isGreen
+                              ? `rgba(48,209,88,${0.08 + (wr / 100) * 0.22})`
+                              : isYellow
+                                ? `rgba(255,159,10,${0.08 + (wr / 100) * 0.2})`
+                                : `rgba(255,69,58,${0.08 + ((100 - wr) / 100) * 0.22})`
+                            const borderColor = isGreen ? 'rgba(48,209,88,0.25)' : isYellow ? 'rgba(255,159,10,0.25)' : 'rgba(255,69,58,0.25)'
+                            const textColor = isGreen ? '#30D158' : isYellow ? '#FF9F0A' : '#FF453A'
+                            return (
+                              <div key={`${conf}-${day}`} style={{
+                                borderRadius: '10px', background: bgColor, border: `1px solid ${borderColor}`,
+                                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                                minHeight: '52px', gap: '1px', cursor: 'default',
+                                transition: 'transform 0.1s',
+                              }}
+                                title={`${conf} on ${day}: ${cell.wins}/${cell.trades} trades won`}
+                                onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.04)'}
+                                onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                              >
+                                <span style={{ fontSize: '14px', fontWeight: 700, color: textColor, letterSpacing: '-0.02em' }}>{wr}%</span>
+                                <span style={{ fontSize: '10px', fontWeight: 500, color: 'var(--text-muted)' }}>{cell.trades} trade{cell.trades !== 1 ? 's' : ''}</span>
+                              </div>
+                            )
+                          })
+                        ]
+                      })}
+                    </div>
                   </div>
                 </div>
               )}
