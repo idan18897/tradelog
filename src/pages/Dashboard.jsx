@@ -10,6 +10,8 @@ import { useLang } from '../context/LanguageContext'
 import DatePicker from '../components/DatePicker'
 import { computePnL } from '../lib/utils'
 import { useUserSettings } from '../context/UserSettingsContext'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 
 function formatDate(iso) {
   if (!iso) return '--'
@@ -57,6 +59,7 @@ export default function Dashboard() {
   const [customOpen, setCustomOpen] = useState(false)
   const [hourView, setHourView] = useState('winRate') // 'winRate' | 'volume'
   const [dashTab, setDashTab] = useState('overview') // 'overview' | 'confirmations'
+  const [showReportModal, setShowReportModal] = useState(false)
   const customRef = useRef(null)
 
   useEffect(() => {
@@ -342,6 +345,36 @@ export default function Dashboard() {
     .sort((a, b) => a.hour - b.hour)
     .map(h => ({ ...h, label: `${String(h.hour).padStart(2, '0')}:00` }))
 
+  // Performance by Holding Time
+  const HOLD_BUCKETS = [
+    { label: '0–30 min', min: 0, max: 30, color: '#0A84FF' },
+    { label: '30–60 min', min: 30, max: 60, color: '#30D158' },
+    { label: '1–2 hrs', min: 60, max: 120, color: '#FF9F0A' },
+    { label: '2–4 hrs', min: 120, max: 240, color: '#BF5AF2' },
+    { label: '4+ hrs', min: 240, max: Infinity, color: '#64D2FF' },
+  ]
+  function timeToMins(t) {
+    if (!t) return null
+    const p = t.split(':')
+    return p.length < 2 ? null : parseInt(p[0], 10) * 60 + parseInt(p[1], 10)
+  }
+  const perfByHoldTime = HOLD_BUCKETS.map(bucket => {
+    const bucketTrades = allLiveTrades.filter(inDateRange).filter(tr => {
+      if (!tr.time || !tr.exit_time || ['Open', 'Invalid'].includes(tr.outcome)) return false
+      const entry = timeToMins(tr.time)
+      const exit = timeToMins(tr.exit_time)
+      if (entry === null || exit === null) return false
+      const diff = exit >= entry ? exit - entry : 24 * 60 - entry + exit
+      return diff >= bucket.min && diff < bucket.max
+    })
+    const closed = bucketTrades.filter(tr => ['TP', 'Partial TP', 'SL', 'BE'].includes(tr.outcome))
+    const tp = bucketTrades.filter(tr => tr.outcome === 'TP' || tr.outcome === 'Partial TP')
+    const winRate = closed.length ? Math.round(tp.length / closed.length * 100) : null
+    const avgRR = tp.length ? parseFloat((tp.reduce((s, tr) => s + (tr.rr_potential || 0), 0) / tp.length).toFixed(2)) : null
+    const pnl = parseFloat(bucketTrades.reduce((s, tr) => s + computePnL(tr), 0).toFixed(2))
+    return { ...bucket, total: bucketTrades.length, tp: tp.length, sl: bucketTrades.filter(t => t.outcome === 'SL').length, winRate, avgRR, pnl }
+  }).filter(b => b.total > 0)
+
   // Equity curve — running cumulative P&L per closed trade
   const sortedForEquity = [...liveTrades]
     .filter(tr => ['TP', 'SL', 'BE'].includes(tr.outcome))
@@ -394,6 +427,188 @@ export default function Dashboard() {
   const grossProfit = tpTrades.reduce((s, tr) => s + computePnL(tr), 0)
   const grossLoss = slTrades.reduce((s, tr) => s + Math.abs(computePnL(tr)), 0)
   const profitFactor = grossLoss > 0 ? parseFloat((grossProfit / grossLoss).toFixed(2)) : null
+
+  function generateReport(period) {
+    const now = new Date()
+    let from, to
+    if (period === 'weekly') {
+      const day = now.getDay()
+      from = new Date(now); from.setDate(now.getDate() - day)
+      to = new Date(now)
+    } else {
+      from = new Date(now.getFullYear(), now.getMonth(), 1)
+      to = new Date(now)
+    }
+    const fromStr = from.toISOString().slice(0, 10)
+    const toStr = to.toISOString().slice(0, 10)
+    const reportTrades = allLiveTrades.filter(tr =>
+      tr.date >= fromStr && tr.date <= toStr && !['Open', 'Invalid'].includes(tr.outcome)
+    )
+    const rClosed = reportTrades.filter(tr => ['TP', 'Partial TP', 'SL', 'BE'].includes(tr.outcome))
+    const rTP = reportTrades.filter(tr => tr.outcome === 'TP' || tr.outcome === 'Partial TP')
+    const rWinRate = rClosed.length ? ((rTP.length / rClosed.length) * 100).toFixed(1) : 'N/A'
+    const rTotalPnL = reportTrades.reduce((s, tr) => s + computePnL(tr), 0).toFixed(2)
+    const rAvgRR = rTP.length ? (rTP.reduce((s, tr) => s + (tr.rr_potential || 0), 0) / rTP.length).toFixed(2) : 'N/A'
+    const rGrossProfit = rTP.reduce((s, tr) => s + computePnL(tr), 0)
+    const rGrossLoss = reportTrades.filter(tr => tr.outcome === 'SL').reduce((s, tr) => s + Math.abs(computePnL(tr)), 0)
+    const rPF = rGrossLoss > 0 ? (rGrossProfit / rGrossLoss).toFixed(2) : 'N/A'
+
+    // Per-day summary
+    const dayMap = {}
+    reportTrades.forEach(tr => {
+      if (!dayMap[tr.date]) dayMap[tr.date] = { date: tr.date, trades: 0, pnl: 0, wins: 0 }
+      dayMap[tr.date].trades++
+      dayMap[tr.date].pnl += computePnL(tr)
+      if (tr.outcome === 'TP' || tr.outcome === 'Partial TP') dayMap[tr.date].wins++
+    })
+    const dayRows = Object.values(dayMap).sort((a, b) => a.date.localeCompare(b.date))
+
+    // Per-pair summary
+    const pairMapR = {}
+    reportTrades.forEach(tr => {
+      if (!pairMapR[tr.pair]) pairMapR[tr.pair] = { pair: tr.pair, trades: 0, pnl: 0, wins: 0, closed: 0 }
+      pairMapR[tr.pair].trades++
+      pairMapR[tr.pair].pnl += computePnL(tr)
+      if (tr.outcome === 'TP' || tr.outcome === 'Partial TP') { pairMapR[tr.pair].wins++; pairMapR[tr.pair].closed++ }
+      else if (['SL', 'BE'].includes(tr.outcome)) pairMapR[tr.pair].closed++
+    })
+    const pairRows = Object.values(pairMapR).sort((a, b) => b.pnl - a.pnl)
+
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+    const pageW = doc.internal.pageSize.getWidth()
+    const accent = [10, 132, 255]
+
+    // Header bar
+    doc.setFillColor(...accent)
+    doc.rect(0, 0, pageW, 22, 'F')
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(16)
+    doc.setFont('helvetica', 'bold')
+    doc.text('TradingLog Report', 14, 14)
+    const label = period === 'weekly' ? 'Weekly Report' : 'Monthly Report'
+    const dateLabel = `${fromStr} → ${toStr}`
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'normal')
+    doc.text(`${label}  ·  ${dateLabel}`, pageW - 14, 14, { align: 'right' })
+
+    // Stats summary
+    doc.setTextColor(30, 30, 30)
+    doc.setFontSize(11)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Summary', 14, 32)
+
+    const stats = [
+      ['Trades', reportTrades.length.toString()],
+      ['Win Rate', `${rWinRate}%`],
+      ['Total P&L', `${Number(rTotalPnL) >= 0 ? '+' : ''}${rTotalPnL}%`],
+      ['Avg R:R', rAvgRR !== 'N/A' ? `1:${rAvgRR}` : 'N/A'],
+      ['Profit Factor', rPF],
+    ]
+    const colW = (pageW - 28) / stats.length
+    stats.forEach(([key, val], i) => {
+      const x = 14 + i * colW
+      doc.setFillColor(245, 245, 250)
+      doc.roundedRect(x, 36, colW - 3, 18, 2, 2, 'F')
+      doc.setFontSize(8)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(120, 120, 130)
+      doc.text(key, x + (colW - 3) / 2, 41, { align: 'center' })
+      doc.setFontSize(11)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(Number(rTotalPnL) < 0 && key === 'Total P&L' ? 200 : 30, 30, 30)
+      doc.text(val, x + (colW - 3) / 2, 49, { align: 'center' })
+    })
+    doc.setTextColor(30, 30, 30)
+
+    // Trades table
+    doc.setFontSize(11)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Trades', 14, 63)
+    autoTable(doc, {
+      startY: 66,
+      head: [['Date', 'Pair', 'Direction', 'Outcome', 'P&L %', 'Rating']],
+      body: reportTrades.map(tr => {
+        const pnl = computePnL(tr)
+        return [
+          tr.date,
+          tr.pair || '—',
+          tr.direction || '—',
+          tr.outcome,
+          `${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}%`,
+          tr.rating ? `${tr.rating}/5` : '—',
+        ]
+      }),
+      headStyles: { fillColor: accent, fontSize: 8, fontStyle: 'bold' },
+      bodyStyles: { fontSize: 8 },
+      alternateRowStyles: { fillColor: [248, 248, 252] },
+      columnStyles: {
+        4: { halign: 'right' },
+        5: { halign: 'center' },
+      },
+      margin: { left: 14, right: 14 },
+    })
+
+    let y = doc.lastAutoTable.finalY + 10
+
+    // By Day
+    if (dayRows.length > 0) {
+      if (y > 220) { doc.addPage(); y = 20 }
+      doc.setFontSize(11)
+      doc.setFont('helvetica', 'bold')
+      doc.text('Performance by Day', 14, y)
+      autoTable(doc, {
+        startY: y + 3,
+        head: [['Date', 'Trades', 'Wins', 'P&L %']],
+        body: dayRows.map(d => [
+          d.date,
+          d.trades.toString(),
+          d.wins.toString(),
+          `${d.pnl >= 0 ? '+' : ''}${d.pnl.toFixed(2)}%`,
+        ]),
+        headStyles: { fillColor: [60, 60, 70], fontSize: 8 },
+        bodyStyles: { fontSize: 8 },
+        alternateRowStyles: { fillColor: [248, 248, 252] },
+        columnStyles: { 3: { halign: 'right' } },
+        margin: { left: 14, right: 14 },
+      })
+      y = doc.lastAutoTable.finalY + 10
+    }
+
+    // By Pair
+    if (pairRows.length > 0) {
+      if (y > 220) { doc.addPage(); y = 20 }
+      doc.setFontSize(11)
+      doc.setFont('helvetica', 'bold')
+      doc.text('Performance by Pair', 14, y)
+      autoTable(doc, {
+        startY: y + 3,
+        head: [['Pair', 'Trades', 'Win Rate', 'P&L %']],
+        body: pairRows.map(p => [
+          p.pair,
+          p.trades.toString(),
+          p.closed ? `${Math.round(p.wins / p.closed * 100)}%` : '—',
+          `${p.pnl >= 0 ? '+' : ''}${p.pnl.toFixed(2)}%`,
+        ]),
+        headStyles: { fillColor: [60, 60, 70], fontSize: 8 },
+        bodyStyles: { fontSize: 8 },
+        alternateRowStyles: { fillColor: [248, 248, 252] },
+        columnStyles: { 3: { halign: 'right' } },
+        margin: { left: 14, right: 14 },
+      })
+    }
+
+    // Footer
+    const totalPages = doc.internal.getNumberOfPages()
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i)
+      doc.setFontSize(7)
+      doc.setTextColor(160, 160, 160)
+      doc.text(`TradingLog · Generated ${now.toLocaleDateString()} · Page ${i}/${totalPages}`, pageW / 2, 290, { align: 'center' })
+    }
+
+    doc.save(`TradingLog_${label.replace(' ', '_')}_${fromStr}.pdf`)
+    setShowReportModal(false)
+  }
 
   // ── Confirmation Analysis ──
   const confTrades = liveTrades.filter(tr =>
@@ -562,6 +777,47 @@ export default function Dashboard() {
       className={`page-wrap transition-all duration-300 ${visible ? 'fade-in' : 'opacity-0'}`}
       style={{ padding: '28px 32px', maxWidth: '1400px', margin: '0 auto' }}
     >
+      {/* Report Modal */}
+      {showReportModal && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={() => setShowReportModal(false)}
+        >
+          <div
+            style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '20px', padding: '28px', width: '320px', boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 style={{ fontSize: '17px', fontWeight: 700, color: 'var(--text)', marginBottom: '6px' }}>Export Report</h3>
+            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '20px' }}>Generate a PDF with stats and trade list for the selected period</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {[
+                { key: 'weekly', label: '📅 Weekly Report', sub: 'This week\'s trades' },
+                { key: 'monthly', label: '📆 Monthly Report', sub: 'This month\'s trades' },
+              ].map(({ key, label, sub }) => (
+                <button
+                  key={key}
+                  onClick={() => generateReport(key)}
+                  style={{
+                    padding: '14px 16px', borderRadius: '12px', textAlign: 'left', cursor: 'pointer',
+                    border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)',
+                    display: 'flex', flexDirection: 'column', gap: '3px', transition: 'all 0.15s',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.background = 'var(--card-hover)' }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--bg)' }}
+                >
+                  <span style={{ fontSize: '14px', fontWeight: 600 }}>{label}</span>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{sub}</span>
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setShowReportModal(false)}
+              style={{ marginTop: '14px', width: '100%', padding: '9px', borderRadius: '10px', background: 'none', border: '1px solid var(--border)', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '13px' }}
+            >Cancel</button>
+          </div>
+        </div>
+      )}
+
       {/* ── Time Filter Bar ── */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', marginBottom: '20px' }}>
         <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text)', marginRight: '8px', letterSpacing: '-0.03em' }}>
@@ -668,6 +924,24 @@ export default function Dashboard() {
 
         {/* Separator */}
         <div style={{ width: '1px', height: '24px', background: 'var(--border)' }} />
+
+        {/* Export Report button */}
+        <button
+          onClick={() => setShowReportModal(true)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '6px',
+            padding: '6px 14px', borderRadius: '20px', fontSize: '13px', fontWeight: 600,
+            cursor: 'pointer', border: '1px solid var(--border)',
+            background: 'transparent', color: 'var(--text-muted)', transition: 'all 0.15s',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--accent)' }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-muted)' }}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          Export Report
+        </button>
 
         {/* Missed trades toggle */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1477,6 +1751,40 @@ export default function Dashboard() {
               <div style={{ width: '24px', height: '3px', background: '#f59e0b', borderRadius: '2px' }} />
               <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>New York 15:00–19:00</span>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Performance by Holding Time ── */}
+      {perfByHoldTime.length > 0 && (
+        <div style={{ ...cardStyle, padding: '20px', marginBottom: '20px' }}>
+          <h2 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', marginBottom: '4px' }}>Performance by Holding Time</h2>
+          <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '20px' }}>Only trades with entry and exit time recorded</p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px' }}>
+            {perfByHoldTime.map(bucket => (
+              <div key={bucket.label} style={{ background: 'var(--bg)', borderRadius: '12px', padding: '16px', borderTop: `3px solid ${bucket.color}` }}>
+                <p style={{ fontSize: '12px', fontWeight: 700, color: bucket.color, marginBottom: '12px' }}>{bucket.label}</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {[
+                    { label: 'Trades', value: bucket.total.toString(), color: 'var(--text)' },
+                    { label: 'Win Rate', value: bucket.winRate !== null ? `${bucket.winRate}%` : '--', color: bucket.winRate >= 50 ? '#30D158' : '#FF453A' },
+                    { label: 'Avg R:R', value: bucket.avgRR ? `1:${bucket.avgRR}` : '--', color: 'var(--text)' },
+                    { label: 'P&L', value: `${bucket.pnl >= 0 ? '+' : ''}${bucket.pnl.toFixed(2)}%${dollarStr(bucket.pnl)}`, color: bucket.pnl >= 0 ? '#30D158' : '#FF453A' },
+                  ].map(row => (
+                    <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{row.label}</span>
+                      <span style={{ fontSize: '13px', fontWeight: 600, color: row.color }}>{row.value}</span>
+                    </div>
+                  ))}
+                </div>
+                {/* Win rate bar */}
+                {bucket.winRate !== null && (
+                  <div style={{ marginTop: '10px', height: '4px', background: 'var(--border)', borderRadius: '2px', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${bucket.winRate}%`, background: bucket.color, borderRadius: '2px', transition: 'width 0.4s ease' }} />
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       )}
