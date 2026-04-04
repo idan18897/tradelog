@@ -529,6 +529,168 @@ export default function Dashboard() {
     riskOfRuin = parseFloat(Math.min(q * 100, 100).toFixed(1))
   }
 
+  // ── Trading Insights ────────────────────────────────────────
+  const insightTrades = allLiveTrades.filter(inDateRange).filter(tr => !['Open', 'Invalid'].includes(tr.outcome))
+  const insightClosed = insightTrades.filter(tr => ['TP', 'Partial TP', 'SL', 'BE'].includes(tr.outcome))
+  const insightWR = insightClosed.length ? Math.round(insightTrades.filter(t => t.outcome === 'TP' || t.outcome === 'Partial TP').length / insightClosed.length * 100) : null
+  const rawInsights = []
+
+  // 1. Best day of week
+  if (perfByDay.length >= 2) {
+    const withWR = perfByDay.filter(d => d.winRate !== null && d.total >= 3)
+    if (withWR.length >= 2) {
+      const best = withWR.reduce((a, b) => b.winRate > a.winRate ? b : a)
+      const worst = withWR.reduce((a, b) => b.winRate < a.winRate ? b : a)
+      const diff = best.winRate - worst.winRate
+      if (diff >= 15) rawInsights.push({
+        icon: '🏆', score: diff,
+        text: `Your best day is <b>${best.name}</b> with <b>${best.winRate}% win rate</b> across ${best.total} trades — ${diff}% higher than ${worst.name}`,
+      })
+    }
+  }
+
+  // 2. Most profitable pair
+  if (perfByPair.length >= 2) {
+    const withMinTrades = perfByPair.filter(p => p.total >= 3)
+    if (withMinTrades.length >= 1) {
+      const best = withMinTrades[0] // already sorted by pnl
+      const second = withMinTrades[1]
+      if (best.pnl > 0 && (!second || best.pnl > second.pnl)) rawInsights.push({
+        icon: '📈', score: Math.abs(best.pnl),
+        text: `<b>${best.pair}</b> is your most profitable pair with <b>+${best.pnl.toFixed(2)}% total P&L</b>${best.winRate !== null ? ` and ${best.winRate}% win rate` : ''} across ${best.total} trades`,
+      })
+    }
+    // Worst pair
+    const withLoss = perfByPair.filter(p => p.total >= 3 && p.pnl < 0)
+    if (withLoss.length >= 1) {
+      const worst = withLoss[withLoss.length - 1]
+      rawInsights.push({
+        icon: '⚠️', score: Math.abs(worst.pnl),
+        text: `<b>${worst.pair}</b> is dragging your P&L — <b>${worst.pnl.toFixed(2)}%</b> loss across ${worst.total} trades`,
+      })
+    }
+  }
+
+  // 3. Best confirmation (single) vs without
+  if (insightClosed.length >= 6) {
+    const confWRMap = {}
+    insightClosed.forEach(tr => {
+      (tr.confirmations || []).forEach(c => {
+        if (!confWRMap[c]) confWRMap[c] = { wins: 0, total: 0 }
+        confWRMap[c].total++
+        if (tr.outcome === 'TP' || tr.outcome === 'Partial TP') confWRMap[c].wins++
+      })
+    })
+    const confList = Object.entries(confWRMap)
+      .filter(([, v]) => v.total >= 3)
+      .map(([c, v]) => ({ conf: c, wr: Math.round(v.wins / v.total * 100), n: v.total }))
+      .sort((a, b) => b.wr - a.wr)
+    if (confList.length >= 1 && insightWR !== null) {
+      const best = confList[0]
+      const diff = best.wr - insightWR
+      if (diff >= 10) rawInsights.push({
+        icon: '💡', score: diff,
+        text: `Trades with <b>${best.conf}</b> confirmation have <b>${diff}% higher win rate</b> than your average (${best.wr}% vs ${insightWR}%)`,
+      })
+    }
+  }
+
+  // 4. After 2 consecutive losses
+  if (pctAfterTwoLoss !== null && insightWR !== null && afterTwoLossWins.length >= 3) {
+    const diff = Math.abs(pctAfterTwoLoss - insightWR)
+    if (diff >= 10) rawInsights.push({
+      icon: pctAfterTwoLoss < insightWR ? '⚠️' : '💡',
+      score: diff,
+      text: pctAfterTwoLoss < insightWR
+        ? `Your win rate drops to <b>${pctAfterTwoLoss}%</b> after 2 consecutive losses — ${diff}% below your average`
+        : `Despite 2 losses in a row, your next trade wins <b>${pctAfterTwoLoss}%</b> of the time — you bounce back well`,
+    })
+  }
+
+  // 5. London vs New York session comparison
+  const londonS = perfBySession.find(s => s.name === 'London')
+  const nyS = perfBySession.find(s => s.name === 'New York')
+  if (londonS?.winRate !== null && nyS?.winRate !== null && londonS.total >= 3 && nyS.total >= 3) {
+    const better = londonS.winRate >= nyS.winRate ? londonS : nyS
+    const worse = better === londonS ? nyS : londonS
+    const diff = better.winRate - worse.winRate
+    if (diff >= 10) rawInsights.push({
+      icon: '📈', score: diff,
+      text: `You perform <b>${diff}% better during ${better.name} session</b> (${better.winRate}% win rate) than ${worse.name} (${worse.winRate}%)`,
+    })
+  }
+
+  // 6. Holding time — long vs short trades
+  if (perfByHoldTime.length >= 2) {
+    const long = perfByHoldTime.filter(b => b.min >= 120)
+    const short = perfByHoldTime.filter(b => b.max <= 60)
+    const longWR = long.length && long.reduce((s, b) => s + b.total, 0) >= 3
+      ? Math.round(long.reduce((s, b) => s + (b.tp || 0), 0) / long.reduce((s, b) => s + b.total, 0) * 100)
+      : null
+    const shortWR = short.length && short.reduce((s, b) => s + b.total, 0) >= 3
+      ? Math.round(short.reduce((s, b) => s + (b.tp || 0), 0) / short.reduce((s, b) => s + b.total, 0) * 100)
+      : null
+    if (longWR !== null && shortWR !== null) {
+      const diff = Math.abs(longWR - shortWR)
+      if (diff >= 10) {
+        const betterLabel = longWR >= shortWR ? 'longer (2h+)' : 'shorter (<1h)'
+        const betterWR = longWR >= shortWR ? longWR : shortWR
+        const worseWR = longWR >= shortWR ? shortWR : longWR
+        rawInsights.push({
+          icon: '💡', score: diff,
+          text: `You win more on <b>${betterLabel} trades</b> — ${betterWR}% win rate vs ${worseWR}% for ${longWR >= shortWR ? 'shorter' : 'longer'} ones`,
+        })
+      }
+    }
+  }
+
+  // 7. Friday overtrading
+  const friday = perfByDay.find(d => d.name === 'Friday')
+  if (friday && friday.total >= 3 && insightWR !== null) {
+    const diff = insightWR - (friday.winRate ?? insightWR)
+    if (diff >= 15) rawInsights.push({
+      icon: '⚠️', score: diff,
+      text: `You may be overtrading on Fridays — win rate drops to <b>${friday.winRate}%</b> with ${friday.total} trades (${diff}% below average)`,
+    })
+  }
+
+  // 8. Best combo
+  if (insightClosed.length >= 6) {
+    function getCombos(arr, size) {
+      if (size === 1) return arr.map(a => [a])
+      return arr.flatMap((a, i) => getCombos(arr.slice(i + 1), size - 1).map(rest => [a, ...rest]))
+    }
+    const allConfs = [...new Set(insightClosed.flatMap(tr => tr.confirmations || []))]
+    const combos = getCombos(allConfs, 2).map(combo => {
+      const matches = insightClosed.filter(tr => combo.every(c => (tr.confirmations || []).includes(c)))
+      if (matches.length < 3) return null
+      const wins = matches.filter(t => t.outcome === 'TP' || t.outcome === 'Partial TP').length
+      const wr = Math.round(wins / matches.length * 100)
+      return { combo: combo.join(' + '), wr, n: matches.length }
+    }).filter(Boolean).sort((a, b) => b.wr - a.wr)
+    if (combos.length >= 1 && insightWR !== null) {
+      const best = combos[0]
+      const diff = best.wr - insightWR
+      if (diff >= 10) rawInsights.push({
+        icon: '🏆', score: diff * 1.5,
+        text: `Your best confirmation combo is <b>${best.combo}</b> with <b>${best.wr}% win rate</b> across ${best.n} trades — ${diff}% above average`,
+      })
+    }
+  }
+
+  // 9. Current win/loss streak warning
+  if (currentStreak >= 3 && currentStreakType === 'loss') rawInsights.push({
+    icon: '⚠️', score: currentStreak * 10,
+    text: `You're on a <b>${currentStreak}-trade losing streak</b> — consider reducing size or sitting out until conditions improve`,
+  })
+  if (currentStreak >= 4 && currentStreakType === 'win') rawInsights.push({
+    icon: '🔥', score: currentStreak * 5,
+    text: `You're on a <b>${currentStreak}-trade winning streak</b> — your edge is working, stay disciplined and stick to your rules`,
+  })
+
+  // Sort by score descending, cap at 6
+  const insights = rawInsights.sort((a, b) => b.score - a.score).slice(0, 6)
+
   // Dollar P&L helper
   function dollarStr(pct) {
     if (!showDollarValues || !accountSize) return ''
@@ -2567,6 +2729,36 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+
+      {/* Trading Insights */}
+      {insights.length > 0 && (
+        <div style={{ ...cardStyle, padding: '22px', marginBottom: '20px' }}>
+          <div style={{ marginBottom: '18px' }}>
+            <h2 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text)', marginBottom: '3px', letterSpacing: '-0.01em' }}>Your Trading Insights</h2>
+            <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Auto-generated from your trading data — no AI, pure math</p>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {insights.map((ins, i) => (
+              <div key={i} style={{
+                display: 'flex', alignItems: 'flex-start', gap: '14px',
+                padding: '14px 16px', borderRadius: '12px',
+                background: 'var(--bg-secondary)',
+                border: '1px solid var(--border)',
+                transition: 'border-color 0.15s',
+              }}
+                onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(10,132,255,0.3)'}
+                onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
+              >
+                <span style={{ fontSize: '20px', flexShrink: 0, lineHeight: 1.3 }}>{ins.icon}</span>
+                <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.65, margin: 0 }}
+                  dangerouslySetInnerHTML={{ __html: ins.text.replace(/<b>(.*?)<\/b>/g, '<span style="color:#0A84FF;font-weight:700">$1</span>') }}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       </> }
     </div>
     </>
