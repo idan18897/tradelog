@@ -161,30 +161,12 @@ function Lightbox({ src, label, onClose }) {
 
   return (
     <div
-      style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,0.95)', display: 'flex', flexDirection: 'column' }}
+      style={{ position: 'fixed', inset: 0, zIndex: 2000, background: '#000' }}
       onClick={onClose}
     >
-      {/* Toolbar */}
+      {/* Image — fills entire screen */}
       <div
-        style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)' }}
-        onClick={e => e.stopPropagation()}
-      >
-        <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '14px', fontWeight: 600 }}>{label}</span>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <button style={btnStyle} onClick={() => changeZoom(0.5)}>+</button>
-          <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', minWidth: '44px', textAlign: 'center' }}>{Math.round(zoom * 100)}%</span>
-          <button style={btnStyle} onClick={() => changeZoom(-0.5)}>−</button>
-          <button style={{ ...btnStyle, color: 'rgba(255,255,255,0.5)', fontSize: '13px' }} onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }}>Reset</button>
-          <button
-            style={{ ...btnStyle, background: 'rgba(255,69,58,0.2)', borderColor: 'rgba(255,69,58,0.4)', color: '#FF453A' }}
-            onClick={onClose}
-          >✕ Close</button>
-        </div>
-      </div>
-
-      {/* Image area */}
-      <div
-        style={{ flex: 1, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: zoom > 1 ? (dragging ? 'grabbing' : 'grab') : 'default' }}
+        style={{ position: 'absolute', inset: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: zoom > 1 ? (dragging ? 'grabbing' : 'grab') : 'default' }}
         onClick={e => e.stopPropagation()}
         onWheel={handleWheel}
         onMouseDown={handleMouseDown}
@@ -197,24 +179,42 @@ function Lightbox({ src, label, onClose }) {
           alt={label}
           draggable={false}
           style={{
-            maxWidth: '96vw',
-            maxHeight: '90vh',
+            width: '100vw',
+            height: '100vh',
             objectFit: 'contain',
             transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
             transformOrigin: 'center center',
             transition: dragging ? 'none' : 'transform 0.15s ease',
-            borderRadius: zoom <= 1 ? '8px' : '0',
             userSelect: 'none',
             pointerEvents: 'none',
           }}
         />
       </div>
 
-      {zoom === 1 && (
-        <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.25)', fontSize: '11px', padding: '8px 0 12px' }}>
-          Scroll or +/− to zoom · Drag to pan · ESC to close
-        </p>
-      )}
+      {/* Floating toolbar — sits on top of image */}
+      <div
+        style={{
+          position: 'absolute', top: '16px', right: '16px',
+          display: 'flex', alignItems: 'center', gap: '6px',
+          background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(12px)',
+          border: '1px solid rgba(255,255,255,0.12)',
+          borderRadius: '12px', padding: '8px 12px',
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        <button style={btnStyle} onClick={() => changeZoom(0.5)}>+</button>
+        <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '12px', minWidth: '38px', textAlign: 'center' }}>{Math.round(zoom * 100)}%</span>
+        <button style={btnStyle} onClick={() => changeZoom(-0.5)}>−</button>
+        <div style={{ width: '1px', height: '16px', background: 'rgba(255,255,255,0.15)', margin: '0 2px' }} />
+        <button style={{ ...btnStyle, fontSize: '12px', color: 'rgba(255,255,255,0.5)' }} onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }}>Reset</button>
+        <button style={{ ...btnStyle, background: 'rgba(255,69,58,0.25)', borderColor: 'rgba(255,69,58,0.4)', color: '#FF453A' }} onClick={onClose}>✕</button>
+      </div>
+
+      {/* Label bottom-left */}
+      <div style={{ position: 'absolute', bottom: '16px', left: '20px', pointerEvents: 'none' }}>
+        <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', fontWeight: 500 }}>{label}</span>
+        {zoom === 1 && <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: '11px', marginLeft: '12px' }}>Scroll to zoom · Drag to pan · ESC to close</span>}
+      </div>
     </div>
   )
 }
