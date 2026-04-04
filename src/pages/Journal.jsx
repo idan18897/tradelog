@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { useLang } from '../context/LanguageContext'
+import { useUserSettings } from '../context/UserSettingsContext'
 import { computePnL, computeMissedPotGain } from '../lib/utils'
 
 const DEFAULT_PAIRS = ['XAUUSD', 'EURUSD', 'GBPUSD', 'USDJPY', 'GBPJPY', 'USDCHF', 'AUDUSD', 'NAS100', 'US30', 'USOIL']
@@ -13,6 +14,16 @@ function formatDate(iso) {
   if (!iso) return '--'
   const [y, m, d] = iso.split('-')
   return `${d}/${m}/${y}`
+}
+
+function holdingTime(trade) {
+  if (!trade.time || !trade.exit_time) return null
+  const [h1, m1] = trade.time.split(':').map(Number)
+  const [h2, m2] = trade.exit_time.split(':').map(Number)
+  let mins = (h2 * 60 + m2) - (h1 * 60 + m1)
+  if (mins < 0) mins += 24 * 60
+  if (mins < 60) return `${mins}m`
+  return `${Math.floor(mins / 60)}h ${mins % 60}m`
 }
 
 
@@ -471,6 +482,7 @@ function CopyIcon() {
 export default function Journal() {
   const { user } = useAuth()
   const { t } = useLang()
+  const { accountSize, showDollarValues } = useUserSettings()
   const navigate = useNavigate()
   const [trades, setTrades] = useState([])
   const [pairsList, setPairsList] = useState(DEFAULT_PAIRS)
@@ -1181,394 +1193,413 @@ export default function Journal() {
         )
       })()}
 
-      {/* Table */}
-      <div style={{ ...cardStyle, overflow: 'hidden', marginBottom: '16px' }}>
-        {filtered.length === 0 ? (
-          <p style={{ fontSize: '13px', textAlign: 'center', padding: '48px 0', color: 'var(--text-muted)' }}>
-            {t.noResults}
-          </p>
-        ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                  {headers.map(h => {
-                    const sortable = !!h.key && h.key in SORT_KEYS
-                    const isActive = sortable && sortKey === h.key
-                    return (
-                      <th
-                        key={h.label}
-                        onClick={sortable ? () => handleSort(h.key) : undefined}
-                        style={{
-                          padding: '10px 12px', textAlign: 'start',
-                          fontSize: '11px', fontWeight: 600,
-                          color: isActive ? 'var(--accent)' : 'var(--text-muted)',
-                          whiteSpace: 'nowrap', textTransform: 'uppercase',
-                          letterSpacing: '0.05em',
-                          cursor: sortable ? 'pointer' : 'default',
-                          userSelect: 'none',
-                        }}
-                      >
-                        {h.label}{isActive ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}
-                      </th>
-                    )
-                  })}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(trade => {
-                  const isSelected = selectedTrade?.id === trade.id
-                  const badge = getOutcomeBadge(trade.outcome)
-                  const showType = activeTab === 'backtest' || activeTab === 'combined'
-                  return (
-                    <tr
-                      key={trade.id}
-                      style={{
-                        borderBottom: '1px solid var(--border)',
-                        background: isSelected ? 'var(--accent-light)' : 'transparent',
-                        cursor: 'pointer',
-                        transition: 'background 0.1s',
-                      }}
-                      onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = 'var(--card-hover)' }}
-                      onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'transparent' }}
-                      onClick={() => setSelectedTrade(isSelected ? null : trade)}
-                    >
-                      <td style={{ padding: '10px 12px', fontSize: '13px', color: 'var(--text)', whiteSpace: 'nowrap' }}>{formatDate(trade.date)}</td>
-                      <td style={{ padding: '10px 12px', fontSize: '13px', color: 'var(--text-muted)' }}>{trade.time || '--'}</td>
+      {/* Table + Side Panel */}
+      <style>{`
+        @keyframes slideInRight {
+          from { opacity: 0; transform: translateX(24px); }
+          to   { opacity: 1; transform: translateX(0); }
+        }
+        @media (max-width: 768px) {
+          .detail-side-panel {
+            position: fixed !important;
+            inset: 0 !important;
+            width: 100% !important;
+            z-index: 200 !important;
+            border-radius: 0 !important;
+          }
+        }
+      `}</style>
 
-                      {showType && (
-                        <td style={{ padding: '10px 12px' }}>
-                          <span style={{
-                            fontSize: '10px',
-                            padding: '2px 7px',
-                            borderRadius: '4px',
-                            fontWeight: 600,
-                            background: (trade.trade_type === 'missed') ? 'rgba(245,158,11,0.15)' : 'var(--accent-light)',
-                            color: (trade.trade_type === 'missed') ? '#FF9F0A' : 'var(--accent)',
-                          }}>
-                            {trade.trade_type === 'missed' ? 'Missed' : 'Live ✓'}
-                          </span>
-                        </td>
-                      )}
-
-                      <td style={{ padding: '10px 12px', fontSize: '13px', fontWeight: 500, color: 'var(--text)' }}>{trade.pair}</td>
-                      <td style={{ padding: '10px 12px' }}>
-                        <span style={{
-                          fontSize: '11px',
-                          padding: '3px 8px',
-                          borderRadius: '5px',
-                          fontWeight: 500,
-                          background: trade.direction === 'Long' ? 'var(--long-color-bg)' : 'var(--short-color-bg)',
-                          color: trade.direction === 'Long' ? 'var(--long-color)' : 'var(--short-color)',
-                        }}>
-                          {trade.direction}
-                        </span>
-                      </td>
-                      <td style={{ padding: '10px 12px', fontSize: '13px', color: 'var(--text)' }}>{trade.entry ?? '--'}</td>
-
-                      {(activeTab === 'live' || activeTab === 'combined') && (
-                        <td style={{ padding: '10px 12px', fontSize: '13px', color: 'var(--text)' }}>{trade.sl_pips ?? '--'}</td>
-                      )}
-
-                      <td style={{ padding: '10px 12px', fontSize: '13px', color: 'var(--text)' }}>
-                        {(() => { const v = trade.pot_rr || trade.rr_potential; return v ? `1:${v}` : '--' })()}
-                      </td>
-
-                      {(activeTab === 'live' || activeTab === 'combined') && (
-                        <td style={{ padding: '10px 12px', fontSize: '13px', color: 'var(--text)' }}>
-                          {trade.risk_pct ? `${trade.risk_pct}%` : '--'}
-                        </td>
-                      )}
-
-                      <td style={{ padding: '10px 12px' }}>
-                        <span style={{
-                          fontSize: '11px',
-                          padding: '3px 8px',
-                          borderRadius: '5px',
-                          fontWeight: 500,
-                          background: badge.bg,
-                          color: badge.color,
-                        }}>
-                          {trade.outcome}
-                        </span>
-                      </td>
-                      <td style={{ padding: '10px 12px' }}>
-                        <MiniStars value={trade.rating} />
-                      </td>
-
-                      {(activeTab === 'live' || activeTab === 'combined') && (
-                        <td style={{ padding: '10px 12px' }}>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', maxWidth: '140px' }}>
-                            {(trade.confirmations || []).slice(0, 3).map(c => (
-                              <span
-                                key={c}
-                                style={{
-                                  fontSize: '10px',
-                                  padding: '2px 6px',
-                                  borderRadius: '4px',
-                                  background: 'rgba(129,140,248,0.15)',
-                                  color: '#818cf8',
-                                }}
-                              >
-                                {c}
-                              </span>
-                            ))}
-                            {(trade.confirmations || []).length > 3 && (
-                              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                                +{trade.confirmations.length - 3}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                      )}
-
-                      {activeTab === 'live' && (
-                        <td style={{ padding: '10px 12px' }} onClick={e => e.stopPropagation()}>
-                          <div style={{ display: 'flex', gap: '4px' }}>
-                            {trade.screenshot_url ? (
-                              <img
-                                src={trade.screenshot_url}
-                                alt="HTF"
-                                title="HTF Screenshot"
-                                onClick={() => setLightbox({ src: trade.screenshot_url, label: 'HTF Screenshot' })}
-                                style={{ width: '38px', height: '38px', objectFit: 'cover', borderRadius: '5px', border: '1px solid var(--border)', cursor: 'zoom-in' }}
-                              />
-                            ) : null}
-                            {trade.ltf_screenshot_url ? (
-                              <img
-                                src={trade.ltf_screenshot_url}
-                                alt="LTF"
-                                title="LTF Screenshot"
-                                onClick={() => setLightbox({ src: trade.ltf_screenshot_url, label: 'LTF Screenshot' })}
-                                style={{ width: '38px', height: '38px', objectFit: 'cover', borderRadius: '5px', border: '1px solid var(--border)', cursor: 'zoom-in' }}
-                              />
-                            ) : null}
-                            {!trade.screenshot_url && !trade.ltf_screenshot_url && (
-                              <span style={{ color: 'var(--text-subtle)', fontSize: '12px' }}>--</span>
-                            )}
-                          </div>
-                        </td>
-                      )}
-
-                      <td style={{ padding: '10px 12px' }} onClick={e => e.stopPropagation()}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <button
-                            title="Duplicate trade"
-                            onClick={() => navigate('/new', { state: { duplicate: { ...trade, id: undefined } } })}
-                            style={{ padding: '5px', borderRadius: '5px', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}
-                            onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
-                            onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
+      <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
+        {/* Table */}
+        <div style={{ flex: 1, minWidth: 0, transition: 'all 0.25s ease' }}>
+          <div style={{ ...cardStyle, overflow: 'hidden', marginBottom: '16px' }}>
+            {filtered.length === 0 ? (
+              <p style={{ fontSize: '13px', textAlign: 'center', padding: '48px 0', color: 'var(--text-muted)' }}>
+                {t.noResults}
+              </p>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                      {headers.map(h => {
+                        const sortable = !!h.key && h.key in SORT_KEYS
+                        const isActive = sortable && sortKey === h.key
+                        return (
+                          <th
+                            key={h.label}
+                            onClick={sortable ? () => handleSort(h.key) : undefined}
+                            style={{
+                              padding: '10px 12px', textAlign: 'start',
+                              fontSize: '11px', fontWeight: 600,
+                              color: isActive ? 'var(--accent)' : 'var(--text-muted)',
+                              whiteSpace: 'nowrap', textTransform: 'uppercase',
+                              letterSpacing: '0.05em',
+                              cursor: sortable ? 'pointer' : 'default',
+                              userSelect: 'none',
+                            }}
                           >
-                            <CopyIcon />
-                          </button>
-                          <Link
-                            to={`/edit/${trade.id}`}
-                            style={{ padding: '5px', borderRadius: '5px', color: 'var(--text-muted)', display: 'flex' }}
-                            onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
-                            onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
-                          >
-                            <EditIcon />
-                          </Link>
-                          {/* In backtest tab: only missed trades can be deleted; live TP rows are read-only */}
-                          {(activeTab === 'live' || activeTab === 'combined' || trade.trade_type === 'missed') && (
-                            <button
-                              onClick={() => deleteTrade(trade.id)}
-                              style={{ padding: '5px', borderRadius: '5px', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}
-                              onMouseEnter={e => e.currentTarget.style.color = '#f87171'}
-                              onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
-                            >
-                              <TrashIcon />
-                            </button>
-                          )}
-                        </div>
-                      </td>
+                            {h.label}{isActive ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}
+                          </th>
+                        )
+                      })}
                     </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+                  </thead>
+                  <tbody>
+                    {filtered.map(trade => {
+                      const isSelected = selectedTrade?.id === trade.id
+                      const badge = getOutcomeBadge(trade.outcome)
+                      const showType = activeTab === 'backtest' || activeTab === 'combined'
+                      return (
+                        <tr
+                          key={trade.id}
+                          style={{
+                            borderBottom: '1px solid var(--border)',
+                            background: isSelected ? 'var(--accent-light)' : 'transparent',
+                            cursor: 'pointer',
+                            transition: 'background 0.1s',
+                          }}
+                          onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = 'var(--card-hover)' }}
+                          onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'transparent' }}
+                          onClick={() => setSelectedTrade(isSelected ? null : trade)}
+                        >
+                          <td style={{ padding: '10px 12px', fontSize: '13px', color: 'var(--text)', whiteSpace: 'nowrap' }}>{formatDate(trade.date)}</td>
+                          <td style={{ padding: '10px 12px', fontSize: '13px', color: 'var(--text-muted)' }}>{trade.time || '--'}</td>
+
+                          {showType && (
+                            <td style={{ padding: '10px 12px' }}>
+                              <span style={{
+                                fontSize: '10px', padding: '2px 7px', borderRadius: '4px', fontWeight: 600,
+                                background: (trade.trade_type === 'missed') ? 'rgba(245,158,11,0.15)' : 'var(--accent-light)',
+                                color: (trade.trade_type === 'missed') ? '#FF9F0A' : 'var(--accent)',
+                              }}>
+                                {trade.trade_type === 'missed' ? 'Missed' : 'Live ✓'}
+                              </span>
+                            </td>
+                          )}
+
+                          <td style={{ padding: '10px 12px', fontSize: '13px', fontWeight: 500, color: 'var(--text)' }}>{trade.pair}</td>
+                          <td style={{ padding: '10px 12px' }}>
+                            <span style={{
+                              fontSize: '11px', padding: '3px 8px', borderRadius: '5px', fontWeight: 500,
+                              background: trade.direction === 'Long' ? 'var(--long-color-bg)' : 'var(--short-color-bg)',
+                              color: trade.direction === 'Long' ? 'var(--long-color)' : 'var(--short-color)',
+                            }}>
+                              {trade.direction}
+                            </span>
+                          </td>
+                          <td style={{ padding: '10px 12px', fontSize: '13px', color: 'var(--text)' }}>{trade.entry ?? '--'}</td>
+
+                          {(activeTab === 'live' || activeTab === 'combined') && (
+                            <td style={{ padding: '10px 12px', fontSize: '13px', color: 'var(--text)' }}>{trade.sl_pips ?? '--'}</td>
+                          )}
+
+                          <td style={{ padding: '10px 12px', fontSize: '13px', color: 'var(--text)' }}>
+                            {(() => { const v = trade.pot_rr || trade.rr_potential; return v ? `1:${v}` : '--' })()}
+                          </td>
+
+                          {(activeTab === 'live' || activeTab === 'combined') && (
+                            <td style={{ padding: '10px 12px', fontSize: '13px', color: 'var(--text)' }}>
+                              {trade.risk_pct ? `${trade.risk_pct}%` : '--'}
+                            </td>
+                          )}
+
+                          <td style={{ padding: '10px 12px' }}>
+                            <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '5px', fontWeight: 500, background: badge.bg, color: badge.color }}>
+                              {trade.outcome}
+                            </span>
+                          </td>
+                          <td style={{ padding: '10px 12px' }}>
+                            <MiniStars value={trade.rating} />
+                          </td>
+
+                          {(activeTab === 'live' || activeTab === 'combined') && (
+                            <td style={{ padding: '10px 12px' }}>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', maxWidth: '140px' }}>
+                                {(trade.confirmations || []).slice(0, 3).map(c => (
+                                  <span key={c} style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '4px', background: 'rgba(129,140,248,0.15)', color: '#818cf8' }}>{c}</span>
+                                ))}
+                                {(trade.confirmations || []).length > 3 && (
+                                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>+{trade.confirmations.length - 3}</span>
+                                )}
+                              </div>
+                            </td>
+                          )}
+
+                          {activeTab === 'live' && (
+                            <td style={{ padding: '10px 12px' }} onClick={e => e.stopPropagation()}>
+                              <div style={{ display: 'flex', gap: '4px' }}>
+                                {trade.screenshot_url && (
+                                  <img src={trade.screenshot_url} alt="HTF" title="HTF Screenshot"
+                                    onClick={() => setLightbox({ src: trade.screenshot_url, label: 'HTF Screenshot' })}
+                                    style={{ width: '38px', height: '38px', objectFit: 'cover', borderRadius: '5px', border: '1px solid var(--border)', cursor: 'zoom-in' }}
+                                  />
+                                )}
+                                {trade.ltf_screenshot_url && (
+                                  <img src={trade.ltf_screenshot_url} alt="LTF" title="LTF Screenshot"
+                                    onClick={() => setLightbox({ src: trade.ltf_screenshot_url, label: 'LTF Screenshot' })}
+                                    style={{ width: '38px', height: '38px', objectFit: 'cover', borderRadius: '5px', border: '1px solid var(--border)', cursor: 'zoom-in' }}
+                                  />
+                                )}
+                                {!trade.screenshot_url && !trade.ltf_screenshot_url && (
+                                  <span style={{ color: 'var(--text-subtle)', fontSize: '12px' }}>--</span>
+                                )}
+                              </div>
+                            </td>
+                          )}
+
+                          <td style={{ padding: '10px 12px' }} onClick={e => e.stopPropagation()}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <button title="Duplicate" onClick={() => navigate('/new', { state: { duplicate: { ...trade, id: undefined } } })}
+                                style={{ padding: '5px', borderRadius: '5px', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}
+                                onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
+                                onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
+                              ><CopyIcon /></button>
+                              <Link to={`/edit/${trade.id}`}
+                                style={{ padding: '5px', borderRadius: '5px', color: 'var(--text-muted)', display: 'flex' }}
+                                onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
+                                onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
+                              ><EditIcon /></Link>
+                              {(activeTab === 'live' || activeTab === 'combined' || trade.trade_type === 'missed') && (
+                                <button onClick={() => deleteTrade(trade.id)}
+                                  style={{ padding: '5px', borderRadius: '5px', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}
+                                  onMouseEnter={e => e.currentTarget.style.color = '#f87171'}
+                                  onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
+                                ><TrashIcon /></button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
-        )}
+        </div>
+
+        {/* Side Detail Panel */}
+        {selectedTrade && (() => {
+          const tr = selectedTrade
+          const badge = getOutcomeBadge(tr.outcome)
+          const pnl = computePnL(tr)
+          const rr = tr.pot_rr || tr.rr_potential
+          const ht = holdingTime(tr)
+          const dollarPart = showDollarValues && accountSize
+            ? ` ($${pnl >= 0 ? '+' : ''}${((pnl / 100) * accountSize).toFixed(0)})`
+            : ''
+
+          return (
+            <div
+              className="detail-side-panel"
+              style={{
+                width: '360px', flexShrink: 0,
+                background: 'var(--card)', border: '1px solid var(--border)',
+                borderRadius: '18px', boxShadow: 'var(--shadow-md)',
+                animation: 'slideInRight 0.22s ease',
+                display: 'flex', flexDirection: 'column',
+                maxHeight: 'calc(100vh - 120px)',
+                position: 'sticky', top: '80px',
+                overflow: 'hidden',
+              }}
+            >
+              {/* Header */}
+              <div style={{ padding: '18px 18px 14px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '10px' }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '20px', fontWeight: 750, color: 'var(--text)', letterSpacing: '-0.03em' }}>{tr.pair}</span>
+                      <span style={{
+                        fontSize: '12px', fontWeight: 700, padding: '3px 10px', borderRadius: '20px',
+                        background: tr.direction === 'Long' ? 'var(--long-color-bg)' : 'var(--short-color-bg)',
+                        color: tr.direction === 'Long' ? 'var(--long-color)' : 'var(--short-color)',
+                      }}>{tr.direction}</span>
+                      <span style={{ fontSize: '12px', fontWeight: 600, padding: '3px 10px', borderRadius: '20px', background: badge.bg, color: badge.color }}>{tr.outcome}</span>
+                      {tr.trade_type === 'missed' && (
+                        <span style={{ fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '20px', background: 'rgba(255,159,10,0.15)', color: '#FF9F0A' }}>Missed</span>
+                      )}
+                    </div>
+                    <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '5px' }}>
+                      {formatDate(tr.date)}{tr.day ? ` · ${tr.day}` : ''}
+                      {tr.time ? ` · ${tr.time}` : ''}
+                      {tr.exit_time ? ` → ${tr.exit_time}` : ''}
+                    </p>
+                  </div>
+                  <button onClick={() => setSelectedTrade(null)}
+                    style={{ padding: '6px', borderRadius: '8px', color: 'var(--text-muted)', background: 'var(--bg-secondary)', border: '1px solid var(--border)', cursor: 'pointer', display: 'flex', flexShrink: 0 }}
+                    onMouseEnter={e => { e.currentTarget.style.color = 'var(--text)'; e.currentTarget.style.background = 'var(--card-hover)' }}
+                    onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'var(--bg-secondary)' }}
+                  ><CloseIcon /></button>
+                </div>
+
+                {/* P&L hero */}
+                {tr.outcome !== 'Open' && tr.trade_type !== 'missed' && (
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                    <span style={{ fontSize: '28px', fontWeight: 800, letterSpacing: '-0.04em', color: pnl >= 0 ? '#30D158' : '#FF453A' }}>
+                      {pnl >= 0 ? '+' : ''}{pnl.toFixed(2)}%
+                    </span>
+                    {dollarPart && <span style={{ fontSize: '14px', fontWeight: 600, color: pnl >= 0 ? '#30D158' : '#FF453A', opacity: 0.8 }}>{dollarPart}</span>}
+                  </div>
+                )}
+                {tr.trade_type === 'missed' && (() => {
+                  const gain = computeMissedPotGain(tr)
+                  return gain ? (
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                      <span style={{ fontSize: '22px', fontWeight: 800, color: '#FF9F0A' }}>+{gain.toFixed(2)}%</span>
+                      <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>potential</span>
+                    </div>
+                  ) : null
+                })()}
+              </div>
+
+              {/* Scrollable body */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: '16px 18px' }}>
+
+                {/* Stats grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
+                  {[
+                    { label: 'Entry', value: tr.entry ?? '--' },
+                    { label: 'SL', value: tr.sl ?? '--' },
+                    { label: 'TP', value: tr.tp ?? '--' },
+                    { label: 'SL Pips', value: tr.sl_pips ?? '--' },
+                    { label: 'R:R', value: rr ? `1:${rr}` : '--' },
+                    { label: 'Risk', value: tr.risk_pct ? `${tr.risk_pct}%` : '--' },
+                    ...(ht ? [{ label: 'Hold Time', value: ht }] : []),
+                  ].map(({ label, value }) => (
+                    <div key={label} style={{ background: 'var(--bg-secondary)', borderRadius: '10px', padding: '10px 12px' }}>
+                      <p style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '3px' }}>{label}</p>
+                      <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)' }}>{value}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Rating */}
+                {tr.rating > 0 && (
+                  <div style={{ marginBottom: '14px' }}>
+                    <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Rating</p>
+                    <MiniStars value={tr.rating} />
+                  </div>
+                )}
+
+                {/* SL to BE */}
+                {tr.sl_to_be && (
+                  <div style={{ marginBottom: '14px', padding: '10px 12px', borderRadius: '10px', background: 'rgba(250,204,21,0.08)', border: '1px solid rgba(250,204,21,0.2)' }}>
+                    <p style={{ fontSize: '11px', color: '#facc15', fontWeight: 600, marginBottom: '4px' }}>SL → Breakeven at 1:{tr.be_at || 3}</p>
+                    {(tr.exit_levels || []).length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
+                        {tr.exit_levels.map((lvl, i) => (
+                          <span key={i} style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '6px', background: 'rgba(250,204,21,0.12)', color: '#facc15' }}>
+                            {lvl.pct}% @ 1:{lvl.rr}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Confirmations */}
+                {(tr.confirmations || []).length > 0 && (
+                  <div style={{ marginBottom: '14px' }}>
+                    <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Confirmations</p>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                      {tr.confirmations.map(c => (
+                        <span key={c} style={{ fontSize: '12px', padding: '4px 10px', borderRadius: '20px', background: 'rgba(129,140,248,0.15)', color: '#818cf8', fontWeight: 600 }}>{c}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Missed reason */}
+                {tr.missed_reason && (
+                  <div style={{ marginBottom: '14px' }}>
+                    <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '5px' }}>Why missed</p>
+                    <p style={{ fontSize: '13px', color: '#FF9F0A' }}>{tr.missed_reason}</p>
+                  </div>
+                )}
+
+                {/* Notes */}
+                {tr.notes && (
+                  <div style={{ marginBottom: '14px' }}>
+                    <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '5px' }}>Notes</p>
+                    <p style={{ fontSize: '13px', color: 'var(--text)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{tr.notes}</p>
+                  </div>
+                )}
+
+                {/* Screenshots */}
+                {(tr.screenshot_url || tr.ltf_screenshot_url) && (
+                  <div style={{ marginBottom: '14px' }}>
+                    <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>Screenshots</p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {tr.screenshot_url && (
+                        <div>
+                          <p style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 600, marginBottom: '5px' }}>HTF</p>
+                          <img src={tr.screenshot_url} alt="HTF"
+                            onClick={() => setLightbox({ src: tr.screenshot_url, label: 'HTF Screenshot' })}
+                            style={{ width: '100%', maxHeight: '200px', objectFit: 'contain', borderRadius: '10px', border: '1px solid var(--border)', cursor: 'zoom-in', background: 'var(--bg)' }}
+                          />
+                        </div>
+                      )}
+                      {tr.ltf_screenshot_url && (
+                        <div>
+                          <p style={{ fontSize: '11px', color: '#60a5fa', fontWeight: 600, marginBottom: '5px' }}>LTF</p>
+                          <img src={tr.ltf_screenshot_url} alt="LTF"
+                            onClick={() => setLightbox({ src: tr.ltf_screenshot_url, label: 'LTF Screenshot' })}
+                            style={{ width: '100%', maxHeight: '200px', objectFit: 'contain', borderRadius: '10px', border: '1px solid var(--border)', cursor: 'zoom-in', background: 'var(--bg)' }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Action buttons */}
+              <div style={{ padding: '14px 18px', borderTop: '1px solid var(--border)', display: 'flex', gap: '8px', flexShrink: 0 }}>
+                <Link to={`/edit/${tr.id}`} style={{
+                  flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                  padding: '10px', borderRadius: '10px', fontSize: '13px', fontWeight: 600,
+                  background: 'var(--accent)', color: '#fff', textDecoration: 'none', transition: 'opacity 0.15s',
+                }}
+                  onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
+                  onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+                >
+                  <EditIcon /> Edit
+                </Link>
+                <button onClick={() => navigate('/new', { state: { duplicate: { ...tr, id: undefined } } })}
+                  style={{
+                    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                    padding: '10px', borderRadius: '10px', fontSize: '13px', fontWeight: 600,
+                    background: 'var(--bg-secondary)', color: 'var(--text)', border: '1px solid var(--border)', cursor: 'pointer', transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--card-hover)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'var(--bg-secondary)'}
+                >
+                  <CopyIcon /> Duplicate
+                </button>
+                {(activeTab === 'live' || activeTab === 'combined' || tr.trade_type === 'missed') && (
+                  <button onClick={() => deleteTrade(tr.id)}
+                    style={{
+                      width: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      padding: '10px', borderRadius: '10px', fontSize: '13px', fontWeight: 600,
+                      background: 'rgba(248,113,113,0.1)', color: '#f87171', border: '1px solid rgba(248,113,113,0.2)', cursor: 'pointer', transition: 'background 0.15s',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(248,113,113,0.2)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'rgba(248,113,113,0.1)'}
+                    title="Delete trade"
+                  >
+                    <TrashIcon />
+                  </button>
+                )}
+              </div>
+            </div>
+          )
+        })()}
       </div>
 
       {/* Lightbox */}
       {lightbox && <Lightbox src={lightbox.src} label={lightbox.label} onClose={() => setLightbox(null)} />}
-
-      {/* Detail panel */}
-      {selectedTrade && (
-        <div style={{ ...cardStyle, padding: '20px' }} className="fade-in">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-            <h2 style={{ fontWeight: 600, color: 'var(--text)' }}>
-              {selectedTrade.pair} — {formatDate(selectedTrade.date)}
-              {selectedTrade.trade_type === 'missed' && (
-                <span style={{
-                  marginRight: '8px',
-                  fontSize: '11px',
-                  padding: '2px 8px',
-                  borderRadius: '5px',
-                  background: 'rgba(245,158,11,0.15)',
-                  color: '#FF9F0A',
-                  fontWeight: 500,
-                }}>
-                  Missed
-                </span>
-              )}
-            </h2>
-            <button
-              onClick={() => setSelectedTrade(null)}
-              style={{ padding: '4px', borderRadius: '5px', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}
-              onMouseEnter={e => e.currentTarget.style.color = 'var(--text)'}
-              onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
-            >
-              <CloseIcon />
-            </button>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px', marginBottom: '16px' }}
-            className="md:grid-cols-4 lg:grid-cols-6">
-            <DetailField label={t.date} value={formatDate(selectedTrade.date)} />
-            <DetailField label="Day" value={selectedTrade.day} />
-            <DetailField label={t.time} value={selectedTrade.time} />
-            <DetailField label={t.pair} value={selectedTrade.pair} />
-            <DetailField label={t.direction}>
-              <span style={{
-                fontSize: '13px',
-                fontWeight: 500,
-                color: selectedTrade.direction === 'Long' ? 'var(--long-color)' : 'var(--short-color)',
-              }}>
-                {selectedTrade.direction}
-              </span>
-            </DetailField>
-            <DetailField label={t.outcome}>
-              {(() => {
-                const badge = getOutcomeBadge(selectedTrade.outcome)
-                return (
-                  <span style={{
-                    fontSize: '11px',
-                    padding: '3px 8px',
-                    borderRadius: '5px',
-                    fontWeight: 500,
-                    background: badge.bg,
-                    color: badge.color,
-                  }}>
-                    {selectedTrade.outcome}
-                  </span>
-                )
-              })()}
-            </DetailField>
-            <DetailField label={t.entry} value={selectedTrade.entry} />
-            <DetailField label="SL" value={selectedTrade.sl} />
-            <DetailField label="TP" value={selectedTrade.tp} />
-            <DetailField label={t.slPips} value={selectedTrade.sl_pips} />
-            <DetailField label={t.rrPotential || 'R:R Potential'} value={(() => { const v = selectedTrade.pot_rr || selectedTrade.rr_potential; return v ? `1:${v}` : '--' })()} />
-            <DetailField label={t.risk} value={selectedTrade.risk_pct ? `${selectedTrade.risk_pct}%` : '--'} />
-            {selectedTrade.trade_type === 'missed' && (() => {
-              const gain = computeMissedPotGain(selectedTrade)
-              if (!gain) return null
-              return (
-                <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '10px', marginTop: '4px' }}>
-                  <span style={{ fontSize: '12px', color: '#FF9F0A' }}>Potential Gain if entered:</span>
-                  <span style={{ fontSize: '18px', fontWeight: 700, color: '#FF9F0A' }}>+{gain.toFixed(2)}%</span>
-                </div>
-              )
-            })()}
-          </div>
-
-          {selectedTrade.sl_to_be && (
-            <div style={{ marginBottom: '14px', padding: '10px 12px', borderRadius: '10px', background: 'rgba(250,204,21,0.08)', border: '1px solid rgba(250,204,21,0.2)' }}>
-              <p style={{ fontSize: '11px', color: '#facc15', fontWeight: 600, marginBottom: '8px' }}>SL to Breakeven</p>
-              <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: selectedTrade.exit_levels?.length ? '8px' : '0' }}>
-                BE at 1:{selectedTrade.be_at || 3}
-              </p>
-              {(selectedTrade.exit_levels || []).length > 0 && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                  {selectedTrade.exit_levels.map((lvl, i) => (
-                    <span key={i} style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '6px', background: 'rgba(250,204,21,0.12)', color: '#facc15' }}>
-                      {lvl.pct}% @ 1:{lvl.rr}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {selectedTrade.rating > 0 && (
-            <div style={{ marginBottom: '14px' }}>
-              <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>
-                {t.tradeRating || 'Trade Rating'}
-              </p>
-              <MiniStars value={selectedTrade.rating} />
-            </div>
-          )}
-
-          {(selectedTrade.confirmations || []).length > 0 && (
-            <div style={{ marginBottom: '14px' }}>
-              <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>{t.confirmations}</p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                {selectedTrade.confirmations.map(c => (
-                  <span
-                    key={c}
-                    style={{
-                      fontSize: '12px',
-                      padding: '4px 10px',
-                      borderRadius: '6px',
-                      background: 'rgba(129,140,248,0.15)',
-                      color: '#818cf8',
-                    }}
-                  >
-                    {c}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {selectedTrade.missed_reason && (
-            <div style={{ marginBottom: '14px' }}>
-              <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '5px' }}>Why missed?</p>
-              <p style={{ fontSize: '13px', color: '#FF9F0A' }}>{selectedTrade.missed_reason}</p>
-            </div>
-          )}
-
-          {selectedTrade.notes && (
-            <div style={{ marginBottom: '14px' }}>
-              <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '5px' }}>{t.notes}</p>
-              <p style={{ fontSize: '13px', color: 'var(--text)' }}>{selectedTrade.notes}</p>
-            </div>
-          )}
-
-          {(selectedTrade.screenshot_url || selectedTrade.ltf_screenshot_url) && (
-            <div>
-              <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '10px' }}>Screenshots</p>
-              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                {selectedTrade.screenshot_url && (
-                  <div style={{ flex: 1, minWidth: '200px' }}>
-                    <p style={{ fontSize: '11px', color: 'var(--accent)', marginBottom: '6px', fontWeight: 600 }}>HTF</p>
-                    <img
-                      src={selectedTrade.screenshot_url}
-                      alt="HTF screenshot"
-                      onClick={() => setLightbox({ src: selectedTrade.screenshot_url, label: 'HTF Screenshot' })}
-                      style={{ width: '100%', maxHeight: '280px', objectFit: 'contain', borderRadius: '10px', border: '1px solid var(--border)', cursor: 'zoom-in', background: 'var(--bg)' }}
-                    />
-                  </div>
-                )}
-                {selectedTrade.ltf_screenshot_url && (
-                  <div style={{ flex: 1, minWidth: '200px' }}>
-                    <p style={{ fontSize: '11px', color: '#60a5fa', marginBottom: '6px', fontWeight: 600 }}>LTF</p>
-                    <img
-                      src={selectedTrade.ltf_screenshot_url}
-                      alt="LTF screenshot"
-                      onClick={() => setLightbox({ src: selectedTrade.ltf_screenshot_url, label: 'LTF Screenshot' })}
-                      style={{ width: '100%', maxHeight: '280px', objectFit: 'contain', borderRadius: '10px', border: '1px solid var(--border)', cursor: 'zoom-in', background: 'var(--bg)' }}
-                    />
-                  </div>
-                )}
-              </div>
-              <p style={{ fontSize: '11px', color: 'var(--text-subtle)', marginTop: '8px' }}>Click image to open full size with zoom</p>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   )
 }
