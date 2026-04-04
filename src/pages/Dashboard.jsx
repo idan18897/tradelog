@@ -271,6 +271,52 @@ export default function Dashboard() {
     else break
   }
 
+  // Streak Analysis — Pattern cards + Timeline
+  // sortedClosed already sorted oldest→newest, live only, no Open/Invalid
+  const afterLossWins = [], afterWinWins = [], afterTwoLossWins = []
+  let streakTimeline = [] // { idx, type:'win'|'loss', length }
+  let tl_curType = null, tl_curLen = 0, tl_startIdx = 0
+  sortedClosed.forEach((tr, i) => {
+    const isWin = tr.outcome === 'TP' || tr.outcome === 'Partial TP'
+    const isSL = tr.outcome === 'SL'
+    // Pattern: after a loss
+    if (i > 0) {
+      const prev = sortedClosed[i - 1]
+      const prevWin = prev.outcome === 'TP' || prev.outcome === 'Partial TP'
+      const prevSL = prev.outcome === 'SL'
+      if (prevSL) afterLossWins.push(isWin ? 1 : 0)
+      if (prevWin) afterWinWins.push(isWin ? 1 : 0)
+    }
+    // Pattern: after 2+ losses in a row
+    if (i >= 2) {
+      const p1 = sortedClosed[i - 1], p2 = sortedClosed[i - 2]
+      if (p1.outcome === 'SL' && p2.outcome === 'SL') afterTwoLossWins.push(isWin ? 1 : 0)
+    }
+    // Build timeline
+    const thisType = isWin ? 'win' : isSL ? 'loss' : null
+    if (!thisType) return
+    if (thisType === tl_curType) {
+      tl_curLen++
+    } else {
+      if (tl_curType) streakTimeline.push({ idx: tl_startIdx, type: tl_curType, length: tl_curLen })
+      tl_curType = thisType; tl_curLen = 1; tl_startIdx = i
+    }
+  })
+  if (tl_curType) streakTimeline.push({ idx: tl_startIdx, type: tl_curType, length: tl_curLen })
+
+  const pctAfterLoss = afterLossWins.length ? Math.round(afterLossWins.reduce((s, v) => s + v, 0) / afterLossWins.length * 100) : null
+  const pctAfterWin = afterWinWins.length ? Math.round(afterWinWins.reduce((s, v) => s + v, 0) / afterWinWins.length * 100) : null
+  const pctAfterTwoLoss = afterTwoLossWins.length ? Math.round(afterTwoLossWins.reduce((s, v) => s + v, 0) / afterTwoLossWins.length * 100) : null
+  const recoveryRate = pctAfterLoss // alias
+
+  // Streak timeline chart data (last 30 streaks)
+  const streakChartData = streakTimeline.slice(-30).map((s, i) => ({
+    i,
+    value: s.type === 'win' ? s.length : -s.length,
+    type: s.type,
+    length: s.length,
+  }))
+
   // Performance by day of week
   const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
   const DAY_NAMES_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -1791,6 +1837,121 @@ export default function Dashboard() {
                 <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                   {currentStreakType === 'win' ? 'Keep it up! Maintain your performance' : 'Analyze the losses and look for a pattern'}
                 </p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Streak Analysis */}
+      {sortedClosed.length >= 3 && (
+        <div style={{ ...cardStyle, padding: '22px', marginBottom: '20px' }}>
+          {/* Header */}
+          <div style={{ marginBottom: '20px' }}>
+            <h2 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text)', marginBottom: '3px', letterSpacing: '-0.01em' }}>Streak Analysis</h2>
+            <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Patterns & behavior based on {sortedClosed.length} closed trades</p>
+          </div>
+
+          {/* Stats row */}
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(5, 1fr)', gap: '12px', marginBottom: '22px' }}>
+            {[
+              { label: 'Max Win Streak', value: maxConsecWins || '--', color: '#30D158', icon: '🔥' },
+              { label: 'Max Loss Streak', value: maxConsecLosses || '--', color: '#FF453A', icon: '❄️' },
+              { label: 'Avg Win Streak', value: avgConsecWins ?? '--', color: '#30D158' },
+              { label: 'Avg Loss Streak', value: avgConsecLosses ?? '--', color: '#FF453A' },
+              { label: 'Recovery Rate', value: recoveryRate !== null ? `${recoveryRate}%` : '--', color: recoveryRate >= 50 ? '#30D158' : '#FF453A', tooltip: 'Win rate of the trade immediately after an SL' },
+            ].map(stat => (
+              <div key={stat.label} style={{ background: 'var(--bg-secondary)', borderRadius: '12px', padding: '14px 16px', position: 'relative' }}>
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  {stat.icon && <span>{stat.icon}</span>}{stat.label}
+                  {stat.tooltip && (
+                    <span title={stat.tooltip} style={{ cursor: 'default', opacity: 0.5 }}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                    </span>
+                  )}
+                </p>
+                <p style={{ fontSize: '22px', fontWeight: 800, color: stat.color, letterSpacing: '-0.03em', lineHeight: 1 }}>{stat.value}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Pattern Analysis cards */}
+          {(pctAfterLoss !== null || pctAfterWin !== null || pctAfterTwoLoss !== null) && (
+            <div style={{ marginBottom: '22px' }}>
+              <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '12px' }}>Pattern Analysis</p>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: '10px' }}>
+                {[
+                  { label: 'After a Loss', pct: pctAfterLoss, n: afterLossWins.length, desc: 'win rate on the next trade after SL' },
+                  { label: 'After a Win', pct: pctAfterWin, n: afterWinWins.length, desc: 'win rate on the next trade after TP' },
+                  { label: 'After 2+ Losses', pct: pctAfterTwoLoss, n: afterTwoLossWins.length, desc: 'win rate after 2 consecutive SLs' },
+                ].map(p => {
+                  if (p.pct === null) return null
+                  const good = p.pct >= 50
+                  const color = good ? '#30D158' : '#FF453A'
+                  const bg = good ? 'rgba(48,209,88,0.08)' : 'rgba(255,69,58,0.08)'
+                  const border = good ? 'rgba(48,209,88,0.2)' : 'rgba(255,69,58,0.2)'
+                  return (
+                    <div key={p.label} style={{ background: bg, border: `1px solid ${border}`, borderRadius: '12px', padding: '16px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                        <div>
+                          <p style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text)', marginBottom: '2px' }}>{p.label}</p>
+                          <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{p.desc}</p>
+                        </div>
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: '8px', flexShrink: 0 }}>n={p.n}</span>
+                      </div>
+                      {/* Mini progress bar */}
+                      <div style={{ height: '4px', borderRadius: '4px', background: 'var(--bg-secondary)', marginBottom: '8px', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${p.pct}%`, borderRadius: '4px', background: color, transition: 'width 0.5s ease' }} />
+                      </div>
+                      <p style={{ fontSize: '24px', fontWeight: 800, color, letterSpacing: '-0.04em', lineHeight: 1 }}>{p.pct}%</p>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Streak Timeline */}
+          {streakChartData.length >= 3 && (
+            <div>
+              <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '12px' }}>Streak Timeline</p>
+              <div style={{ height: isMobile ? 100 : 130 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={streakChartData} barCategoryGap="20%">
+                    <XAxis hide />
+                    <YAxis hide domain={['dataMin', 'dataMax']} />
+                    <Tooltip
+                      cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+                      content={({ active, payload }) => {
+                        if (!active || !payload?.length) return null
+                        const d = payload[0].payload
+                        return (
+                          <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px' }}>
+                            <p style={{ fontSize: '12px', fontWeight: 700, color: d.type === 'win' ? '#30D158' : '#FF453A' }}>
+                              {d.type === 'win' ? '🔥' : '❄️'} {d.length} {d.type === 'win' ? 'win' : 'loss'}{d.length > 1 ? 's' : ''} in a row
+                            </p>
+                          </div>
+                        )
+                      }}
+                    />
+                    <Bar dataKey="value" radius={[3, 3, 0, 0]} maxBarSize={28}>
+                      {streakChartData.map((d, i) => (
+                        <Cell key={i} fill={d.type === 'win' ? '#30D158' : '#FF453A'} fillOpacity={0.8} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div style={{ display: 'flex', gap: '16px', marginTop: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <div style={{ width: '10px', height: '10px', borderRadius: '2px', background: '#30D158' }} />
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Win streak</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <div style={{ width: '10px', height: '10px', borderRadius: '2px', background: '#FF453A' }} />
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Loss streak</span>
+                </div>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: 'auto' }}>Last {streakChartData.length} streaks</span>
               </div>
             </div>
           )}
