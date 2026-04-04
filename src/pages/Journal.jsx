@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, Component } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
@@ -513,7 +513,25 @@ function CopyIcon() {
   )
 }
 
-export default function Journal() {
+class JournalErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { error: null } }
+  static getDerivedStateFromError(error) { return { error } }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ padding: '40px', textAlign: 'center' }}>
+          <h2 style={{ color: '#f87171', marginBottom: '12px' }}>Journal Error</h2>
+          <pre style={{ color: 'var(--text-muted)', fontSize: '13px', textAlign: 'left', background: 'var(--bg-secondary)', padding: '16px', borderRadius: '10px', overflow: 'auto' }}>
+            {this.state.error.message}{'\n'}{this.state.error.stack}
+          </pre>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
+function JournalInner() {
   const { user } = useAuth()
   const { t } = useLang()
   const { accountSize, showDollarValues } = useUserSettings()
@@ -1841,4 +1859,8 @@ export default function Journal() {
       {lightbox && <Lightbox src={lightbox.src} label={lightbox.label} onClose={() => setLightbox(null)} />}
     </div>
   )
+}
+
+export default function Journal() {
+  return <JournalErrorBoundary><JournalInner /></JournalErrorBoundary>
 }
