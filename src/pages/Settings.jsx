@@ -92,7 +92,7 @@ function SortableItem({ item, onDelete }) {
 export default function Settings() {
   const { user } = useAuth()
   const { t } = useLang()
-  const { updateColors, accountSize: ctxAccountSize, setAccountSize: ctxSetAccountSize, showDollarValues: ctxShowDollar, setShowDollarValues: ctxSetShowDollar, dailyReminder: ctxDailyReminder, setDailyReminder: ctxSetDailyReminder, reminderTime: ctxReminderTime, setReminderTime: ctxSetReminderTime } = useUserSettings()
+  const { updateColors, accountSize: ctxAccountSize, setAccountSize: ctxSetAccountSize, showDollarValues: ctxShowDollar, setShowDollarValues: ctxSetShowDollar, dailyReminder: ctxDailyReminder, setDailyReminder: ctxSetDailyReminder, reminderTime: ctxReminderTime, setReminderTime: ctxSetReminderTime, setGoalMonthlyPnl: ctxSetGoalMonthlyPnl, setGoalWinRate: ctxSetGoalWinRate, setGoalTradesCount: ctxSetGoalTradesCount, setGoalAvgRR: ctxSetGoalAvgRR } = useUserSettings()
   const [accountSize, setAccountSizeLocal] = useState(ctxAccountSize || 10000)
   const [showDollarValues, setShowDollarValuesLocal] = useState(ctxShowDollar || false)
   const [dailyReminder, setDailyReminderLocal] = useState(ctxDailyReminder || false)
@@ -144,6 +144,12 @@ export default function Settings() {
       { onConflict: 'user_id' }
     )
   }
+
+  // Monthly goals
+  const [goalMonthlyPnl, setGoalMonthlyPnlLocal] = useState('')
+  const [goalWinRate, setGoalWinRateLocal] = useState('')
+  const [goalTradesCount, setGoalTradesCountLocal] = useState('')
+  const [goalAvgRR, setGoalAvgRRLocal] = useState('')
 
   // Change password
   const [currentPassword, setCurrentPassword] = useState('')
@@ -280,6 +286,10 @@ export default function Settings() {
       }
       if (data.daily_reminder != null) setDailyReminderLocal(data.daily_reminder)
       if (data.reminder_time) setReminderTimeLocal(data.reminder_time)
+      if (data.goal_monthly_pnl != null) setGoalMonthlyPnlLocal(String(data.goal_monthly_pnl))
+      if (data.goal_win_rate != null) setGoalWinRateLocal(String(data.goal_win_rate))
+      if (data.goal_trades_count != null) setGoalTradesCountLocal(String(data.goal_trades_count))
+      if (data.goal_avg_rr != null) setGoalAvgRRLocal(String(data.goal_avg_rr))
     } else {
       setPairs(DEFAULT_PAIRS)
     }
@@ -317,6 +327,10 @@ export default function Settings() {
       exit_modes: exitModes,
       daily_reminder: dailyReminder,
       reminder_time: reminderTime,
+      goal_monthly_pnl: goalMonthlyPnl !== '' ? parseFloat(goalMonthlyPnl) : null,
+      goal_win_rate: goalWinRate !== '' ? parseFloat(goalWinRate) : null,
+      goal_trades_count: goalTradesCount !== '' ? parseInt(goalTradesCount) : null,
+      goal_avg_rr: goalAvgRR !== '' ? parseFloat(goalAvgRR) : null,
     }, { onConflict: 'user_id' })
     setSaving(false)
     if (error) {
@@ -328,6 +342,10 @@ export default function Settings() {
       ctxSetShowDollar(showDollarValues)
       ctxSetDailyReminder(dailyReminder)
       ctxSetReminderTime(reminderTime)
+      ctxSetGoalMonthlyPnl(goalMonthlyPnl !== '' ? parseFloat(goalMonthlyPnl) : null)
+      ctxSetGoalWinRate(goalWinRate !== '' ? parseFloat(goalWinRate) : null)
+      ctxSetGoalTradesCount(goalTradesCount !== '' ? parseInt(goalTradesCount) : null)
+      ctxSetGoalAvgRR(goalAvgRR !== '' ? parseFloat(goalAvgRR) : null)
       // sync localStorage for reminder scheduler
       localStorage.setItem('reminder_enabled', dailyReminder ? '1' : '0')
       localStorage.setItem('reminder_time', reminderTime)
@@ -897,6 +915,45 @@ export default function Settings() {
         )}
       </div>
 
+      {/* ── Monthly Goals ── */}
+      <div style={cardStyle}>
+        <p style={sectionTitle}>Monthly Goals</p>
+        <p style={sectionSub}>Set targets for the current month — progress is shown on the Dashboard</p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px' }}>
+          {[
+            { label: 'Monthly P&L Target', sub: '% gain for the month', value: goalMonthlyPnl, set: v => { setGoalMonthlyPnlLocal(v); setIsDirty(true) }, suffix: '%', min: 0, step: 0.5, placeholder: 'e.g. 5' },
+            { label: 'Win Rate Target', sub: '% of closed trades won', value: goalWinRate, set: v => { setGoalWinRateLocal(v); setIsDirty(true) }, suffix: '%', min: 0, max: 100, step: 1, placeholder: 'e.g. 70' },
+            { label: 'Trades Count Target', sub: 'total trades this month', value: goalTradesCount, set: v => { setGoalTradesCountLocal(v); setIsDirty(true) }, suffix: '', min: 1, step: 1, placeholder: 'e.g. 20' },
+            { label: 'Avg R:R Target', sub: 'average R:R on winning trades', value: goalAvgRR, set: v => { setGoalAvgRRLocal(v); setIsDirty(true) }, suffix: '', min: 0, step: 0.5, placeholder: 'e.g. 3' },
+          ].map(goal => (
+            <div key={goal.label}>
+              <p style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text)', marginBottom: '4px' }}>{goal.label}</p>
+              <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>{goal.sub}</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <input
+                  type="number"
+                  min={goal.min}
+                  max={goal.max}
+                  step={goal.step}
+                  value={goal.value}
+                  onChange={e => goal.set(e.target.value)}
+                  placeholder={goal.placeholder}
+                  style={{ ...inputStyle, maxWidth: '120px' }}
+                />
+                {goal.suffix && <span style={{ color: 'var(--text-muted)', fontSize: '14px' }}>{goal.suffix}</span>}
+                {goal.value !== '' && (
+                  <button onClick={() => { goal.set(''); setIsDirty(true) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-subtle)', fontSize: '16px', padding: '0 4px' }}
+                    title="Clear goal"
+                    onMouseEnter={e => e.currentTarget.style.color = '#f87171'}
+                    onMouseLeave={e => e.currentTarget.style.color = 'var(--text-subtle)'}
+                  >✕</button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       </>)}
 
       {/* ── Save All button — shown on Trading + General tabs ── */}
@@ -925,7 +982,7 @@ export default function Settings() {
                 <polyline points="17 21 17 13 7 13 7 21" />
                 <polyline points="7 3 7 8 15 8" />
               </svg>
-              {t.save || 'שמור הגדרות'}
+              {t.save || 'Save Settings'}
             </>
           )}
         </button>

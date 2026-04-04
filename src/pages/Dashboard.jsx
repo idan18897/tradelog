@@ -51,7 +51,7 @@ const CustomTooltip = ({ active, payload, showDollarValues, accountSize }) => {
 export default function Dashboard() {
   const { user } = useAuth()
   const { t } = useLang()
-  const { accountSize, showDollarValues } = useUserSettings()
+  const { accountSize, showDollarValues, goalMonthlyPnl, goalWinRate, goalTradesCount, goalAvgRR } = useUserSettings()
   const isMobile = useIsMobile()
   const [trades, setTrades] = useState([])
   const [loading, setLoading] = useState(true)
@@ -73,6 +73,9 @@ export default function Dashboard() {
   const [comboSize, setComboSize] = useState(2)
   const [minComboTrades, setMinComboTrades] = useState(3)
   const [comboConfFilter, setComboConfFilter] = useState([]) // filter inside combinations section
+  const [goalToast, setGoalToast] = useState(null)
+  const [confettiPieces, setConfettiPieces] = useState([])
+  const achievedGoalsRef = useRef(new Set())
   const customRef = useRef(null)
 
   useEffect(() => {
@@ -123,6 +126,57 @@ export default function Dashboard() {
   const allLiveTrades = trades.filter(t => (t.trade_type || 'live') === 'live')
   const allMissedTrades = trades.filter(t => t.trade_type === 'missed')
 
+  // Current month goal tracking — always uses allLiveTrades regardless of date filter
+  const now = new Date()
+  const curMonthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const goalMonthTrades = allLiveTrades.filter(t => t.date?.startsWith(curMonthPrefix))
+  const goalMonthClosed = goalMonthTrades.filter(t => ['TP', 'Partial TP', 'SL', 'BE'].includes(t.outcome))
+  const goalMonthTP = goalMonthTrades.filter(t => t.outcome === 'TP' || t.outcome === 'Partial TP')
+  const goalMonthPnLVal = parseFloat(goalMonthTrades.reduce((s, t) => s + computePnL(t), 0).toFixed(2))
+  const goalMonthWinRateVal = goalMonthClosed.length > 0 ? parseFloat((goalMonthTP.length / goalMonthClosed.length * 100).toFixed(1)) : 0
+  const goalMonthCountVal = goalMonthTrades.length
+  const goalMonthAvgRRVal = goalMonthTP.length > 0 ? parseFloat((goalMonthTP.reduce((s, t) => s + (t.rr_potential || 0), 0) / goalMonthTP.length).toFixed(2)) : 0
+
+  const goalItems = [
+    goalMonthlyPnl != null ? { key: 'pnl', label: 'Monthly P&L', current: goalMonthPnLVal, target: goalMonthlyPnl, format: v => `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`, targetFormat: v => `${v}%` } : null,
+    goalWinRate != null ? { key: 'wr', label: 'Win Rate', current: goalMonthWinRateVal, target: goalWinRate, format: v => `${v.toFixed(1)}%`, targetFormat: v => `${v}%` } : null,
+    goalTradesCount != null ? { key: 'tc', label: 'Trades Count', current: goalMonthCountVal, target: goalTradesCount, format: v => String(v), targetFormat: v => String(v) } : null,
+    goalAvgRR != null ? { key: 'rr', label: 'Avg R:R', current: goalMonthAvgRRVal, target: goalAvgRR, format: v => `1:${v.toFixed(2)}`, targetFormat: v => `1:${v}` } : null,
+  ].filter(Boolean)
+
+  // Goal achievement detection — fires confetti + toast when a goal hits 100%
+  useEffect(() => {
+    if (loading || goalItems.length === 0) return
+    const CONFETTI_COLORS = ['#FF453A','#FF9F0A','#30D158','#0A84FF','#BF5AF2','#FFD60A','#32ADE6']
+    let newAchievement = null
+    goalItems.forEach(g => {
+      const pct = g.target > 0 ? (g.current / g.target) * 100 : 0
+      if (pct >= 100 && !achievedGoalsRef.current.has(g.key)) {
+        achievedGoalsRef.current.add(g.key)
+        newAchievement = g.label
+      } else if (pct < 100) {
+        achievedGoalsRef.current.delete(g.key)
+      }
+    })
+    if (newAchievement) {
+      const pieces = Array.from({ length: 80 }, (_, i) => ({
+        id: i,
+        x: Math.random() * 100,
+        delay: Math.random() * 0.6,
+        dur: 2.5 + Math.random() * 1.5,
+        color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
+        size: 6 + Math.random() * 8,
+        rotate: Math.random() * 360,
+        shape: Math.random() > 0.5 ? 'circle' : 'rect',
+      }))
+      setConfettiPieces(pieces)
+      setGoalToast(`🎯 Goal Achieved! ${newAchievement} target reached!`)
+      setTimeout(() => setConfettiPieces([]), 4500)
+      setTimeout(() => setGoalToast(null), 4500)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, goalMonthPnLVal, goalMonthWinRateVal, goalMonthCountVal, goalMonthAvgRRVal])
+
   // liveTrades = the dataset ALL analytics use (respects date filter + missed toggle)
   const liveTrades = [
     ...allLiveTrades.filter(inDateRange),
@@ -144,7 +198,6 @@ export default function Dashboard() {
     ? ((tpTrades.length / closedTrades.length) * 100).toFixed(1)
     : null
 
-  const now = new Date()
   const monthTrades = liveTrades.filter(t => {
     const d = new Date(t.date)
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
@@ -845,6 +898,47 @@ export default function Dashboard() {
 
   return (
     <>
+      {/* Confetti overlay */}
+      {confettiPieces.length > 0 && (
+        <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 9998, overflow: 'hidden' }}>
+          <style>{`
+            @keyframes confettiFall {
+              0% { transform: translateY(-10px) rotate(0deg); opacity: 1; }
+              80% { opacity: 1; }
+              100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+            }
+          `}</style>
+          {confettiPieces.map(p => (
+            <div key={p.id} style={{
+              position: 'absolute',
+              left: `${p.x}%`,
+              top: '-10px',
+              width: p.shape === 'circle' ? `${p.size}px` : `${p.size * 0.7}px`,
+              height: p.shape === 'circle' ? `${p.size}px` : `${p.size * 1.3}px`,
+              borderRadius: p.shape === 'circle' ? '50%' : '2px',
+              background: p.color,
+              animation: `confettiFall ${p.dur}s ease-in ${p.delay}s forwards`,
+              transform: `rotate(${p.rotate}deg)`,
+            }} />
+          ))}
+        </div>
+      )}
+
+      {/* Goal achieved toast */}
+      {goalToast && (
+        <div className="fade-in" style={{
+          position: 'fixed', bottom: '32px', left: '50%', transform: 'translateX(-50%)',
+          background: 'linear-gradient(135deg, #30D158, #0A84FF)',
+          color: '#fff', padding: '14px 24px',
+          borderRadius: '14px', fontSize: '15px', fontWeight: 700,
+          boxShadow: '0 8px 30px rgba(48,209,88,0.4)',
+          zIndex: 9999, whiteSpace: 'nowrap',
+          letterSpacing: '-0.01em',
+        }}>
+          {goalToast}
+        </div>
+      )}
+
       {/* Report Modal — outside page-wrap to avoid transform clipping position:fixed */}
       {showReportModal && (
         <div
@@ -1450,6 +1544,69 @@ export default function Dashboard() {
           </div>
         ))}
       </div>
+
+      {/* Monthly Goals */}
+      {goalItems.length > 0 && (() => {
+        const monthName = now.toLocaleString('en-US', { month: 'long' })
+        return (
+          <div style={{ ...cardStyle, padding: '20px', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
+              <div>
+                <h2 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text)', marginBottom: '3px', letterSpacing: '-0.01em' }}>Monthly Goals</h2>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{monthName} progress</p>
+              </div>
+              <a href="/settings" style={{ fontSize: '12px', color: 'var(--accent)', textDecoration: 'none', fontWeight: 500 }}
+                onMouseEnter={e => e.currentTarget.style.opacity = '0.7'}
+                onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+              >Edit goals →</a>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {goalItems.map(g => {
+                const rawPct = g.target > 0 ? (g.current / g.target) * 100 : 0
+                const pct = Math.min(rawPct, 100)
+                const achieved = pct >= 100
+                const barColor = achieved ? '#30D158' : '#0A84FF'
+                return (
+                  <div key={g.key}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '7px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {achieved && <span style={{ fontSize: '14px' }}>✅</span>}
+                        <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>{g.label}</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 700, color: achieved ? '#30D158' : 'var(--text)' }}>
+                          {g.format(g.current)}
+                        </span>
+                        <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>/ {g.targetFormat(g.target)}</span>
+                        <span style={{
+                          fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '20px',
+                          background: achieved ? 'rgba(48,209,88,0.15)' : 'rgba(10,132,255,0.12)',
+                          color: achieved ? '#30D158' : '#0A84FF',
+                        }}>
+                          {Math.round(pct)}%
+                        </span>
+                      </div>
+                    </div>
+                    {/* Progress bar */}
+                    <div style={{ height: '6px', borderRadius: '6px', background: 'var(--bg-secondary)', overflow: 'hidden' }}>
+                      <div style={{
+                        height: '100%',
+                        width: `${pct}%`,
+                        borderRadius: '6px',
+                        background: achieved
+                          ? '#30D158'
+                          : `linear-gradient(90deg, #0A84FF, ${pct > 70 ? '#30D158' : '#0A84FF'})`,
+                        transition: 'width 0.6s cubic-bezier(0.4,0,0.2,1)',
+                        boxShadow: achieved ? '0 0 8px rgba(48,209,88,0.5)' : 'none',
+                      }} />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Equity Curve */}
       {equityData.length > 1 && (

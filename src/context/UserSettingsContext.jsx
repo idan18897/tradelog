@@ -31,6 +31,10 @@ export function UserSettingsProvider({ children }) {
   const [showDollarValues, setShowDollarValues] = useState(false)
   const [dailyReminder, setDailyReminder] = useState(false)
   const [reminderTime, setReminderTime] = useState('20:00')
+  const [goalMonthlyPnl, setGoalMonthlyPnl] = useState(null)
+  const [goalWinRate, setGoalWinRate] = useState(null)
+  const [goalTradesCount, setGoalTradesCount] = useState(null)
+  const [goalAvgRR, setGoalAvgRR] = useState(null)
 
   useEffect(() => {
     applyColors(DEFAULT_LONG, DEFAULT_SHORT)
@@ -40,7 +44,7 @@ export function UserSettingsProvider({ children }) {
     if (!user) return
     supabase
       .from('user_settings')
-      .select('long_color, short_color, plan, account_size, show_dollar_values, daily_reminder, reminder_time')
+      .select('long_color, short_color, plan, account_size, show_dollar_values, daily_reminder, reminder_time, goal_monthly_pnl, goal_win_rate, goal_trades_count, goal_avg_rr')
       .eq('user_id', user.id)
       .maybeSingle()
       .then(({ data }) => {
@@ -54,6 +58,10 @@ export function UserSettingsProvider({ children }) {
         if (data?.show_dollar_values != null) setShowDollarValues(data.show_dollar_values)
         if (data?.daily_reminder != null) setDailyReminder(data.daily_reminder)
         if (data?.reminder_time) setReminderTime(data.reminder_time)
+        if (data?.goal_monthly_pnl != null) setGoalMonthlyPnl(data.goal_monthly_pnl)
+        if (data?.goal_win_rate != null) setGoalWinRate(data.goal_win_rate)
+        if (data?.goal_trades_count != null) setGoalTradesCount(data.goal_trades_count)
+        if (data?.goal_avg_rr != null) setGoalAvgRR(data.goal_avg_rr)
       })
   }, [user])
 
@@ -64,7 +72,7 @@ export function UserSettingsProvider({ children }) {
   }
 
   return (
-    <UserSettingsContext.Provider value={{ longColor, shortColor, updateColors, plan, accountSize, setAccountSize, showDollarValues, setShowDollarValues, dailyReminder, setDailyReminder, reminderTime, setReminderTime }}>
+    <UserSettingsContext.Provider value={{ longColor, shortColor, updateColors, plan, accountSize, setAccountSize, showDollarValues, setShowDollarValues, dailyReminder, setDailyReminder, reminderTime, setReminderTime, goalMonthlyPnl, setGoalMonthlyPnl, goalWinRate, setGoalWinRate, goalTradesCount, setGoalTradesCount, goalAvgRR, setGoalAvgRR }}>
       {children}
     </UserSettingsContext.Provider>
   )
