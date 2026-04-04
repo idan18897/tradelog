@@ -854,11 +854,11 @@ export default function Dashboard() {
             onClick={e => e.stopPropagation()}
           >
             <h3 style={{ fontSize: '17px', fontWeight: 700, color: 'var(--text)', marginBottom: '4px' }}>Export PDF Report</h3>
-            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '20px' }}>בחר תקופה וייצא דוח עם סטטיסטיקות ורשימת טריידים</p>
+            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '20px' }}>Select a period and export a PDF with stats and trade list</p>
 
             {/* Type toggle */}
             <div style={{ display: 'flex', background: 'var(--bg)', borderRadius: '10px', padding: '3px', marginBottom: '20px', border: '1px solid var(--border)' }}>
-              {[{ key: 'weekly', label: '📅 שבועי' }, { key: 'monthly', label: '📆 חודשי' }].map(({ key, label }) => (
+              {[{ key: 'weekly', label: '📅 Weekly' }, { key: 'monthly', label: '📆 Monthly' }].map(({ key, label }) => (
                 <button key={key} onClick={() => setReportType(key)} style={{
                   flex: 1, padding: '8px', borderRadius: '7px', fontSize: '13px', fontWeight: 600,
                   border: 'none', cursor: 'pointer', transition: 'all 0.15s',
@@ -871,7 +871,7 @@ export default function Dashboard() {
             {/* Date picker */}
             <div style={{ marginBottom: '22px' }}>
               <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                {reportType === 'weekly' ? 'בחר שבוע (כל תאריך בתוך השבוע)' : 'בחר חודש'}
+                {reportType === 'weekly' ? 'Pick any date within the week' : 'Select month'}
               </label>
               {reportType === 'weekly' ? (
                 <input
@@ -901,12 +901,12 @@ export default function Dashboard() {
               onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
               onMouseLeave={e => e.currentTarget.style.opacity = '1'}
             >
-              ייצא PDF ↓
+              Export PDF ↓
             </button>
             <button
               onClick={() => setShowReportModal(false)}
               style={{ width: '100%', padding: '9px', borderRadius: '10px', background: 'none', border: '1px solid var(--border)', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '13px' }}
-            >ביטול</button>
+            >Cancel</button>
           </div>
         </div>
       )}
