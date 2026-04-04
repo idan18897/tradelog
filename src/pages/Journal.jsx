@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { useLang } from '../context/LanguageContext'
 import { useUserSettings } from '../context/UserSettingsContext'
+import { useIsMobile } from '../hooks/useIsMobile'
 import { computePnL, computeMissedPotGain } from '../lib/utils'
 
 const DEFAULT_PAIRS = ['XAUUSD', 'EURUSD', 'GBPUSD', 'USDJPY', 'GBPJPY', 'USDCHF', 'AUDUSD', 'NAS100', 'US30', 'USOIL']
@@ -388,7 +389,7 @@ function TradeCalendar({ trades, secondaryTrades, calMonth, onMonthChange, filte
           return (
             <div key={wi} style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr) 72px', gap: '4px' }}>
               {weekCells.map((day, ci) => {
-                if (day === null) return <div key={`e-${wi}-${ci}`} style={{ minHeight: '72px' }} />
+                if (day === null) return <div key={`e-${wi}-${ci}`} style={{ minHeight: isMobile ? '48px' : '72px' }} />
                 const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
                 const stats = dayStats[dateStr]
                 const missed = missedStats[dateStr]
@@ -415,7 +416,7 @@ function TradeCalendar({ trades, secondaryTrades, calMonth, onMonthChange, filte
                     key={dateStr}
                     onClick={() => hasAny && onDayClick(dateStr)}
                     style={{
-                      minHeight: '72px',
+                      minHeight: isMobile ? '48px' : '72px',
                       borderRadius: '8px',
                       padding: '7px 8px',
                       background: bg,
@@ -515,6 +516,7 @@ export default function Journal() {
   const { user } = useAuth()
   const { t } = useLang()
   const { accountSize, showDollarValues } = useUserSettings()
+  const isMobile = useIsMobile()
   const navigate = useNavigate()
   const [trades, setTrades] = useState([])
   const [pairsList, setPairsList] = useState(DEFAULT_PAIRS)
@@ -744,16 +746,19 @@ export default function Journal() {
     { label: 'Pot. R:R',         key: 'Pot. R:R' },
     { label: t.risk,              key: 'Risk%' },
     { label: t.outcome,           key: 'Outcome' },
+    { label: 'P&L',              key: 'P&L' },
     { label: t.tradeRating || 'Trade Rating', key: 'Rating' },
     { label: t.confirmations,     key: null },
     { label: t.screenshot,        key: null },
     { label: t.actions,           key: null },
   ]
-  const headerKeys = activeTab === 'backtest'
-    ? ['date','Entry Time','Type','Pair','Direction','Entry','Pot. R:R','Outcome','Rating','actions']
-    : activeTab === 'combined'
-      ? ['date','Entry Time','Type','Pair','Direction','Entry','SL Pips','Pot. R:R','Risk%','Outcome','Rating','confirmations','actions']
-      : ['date','Entry Time','Pair','Direction','Entry','SL Pips','Pot. R:R','Risk%','Outcome','Rating','confirmations','screenshot','actions']
+  const headerKeys = isMobile
+    ? ['date','Pair','Outcome','P&L','actions']
+    : activeTab === 'backtest'
+      ? ['date','Entry Time','Type','Pair','Direction','Entry','Pot. R:R','Outcome','Rating','actions']
+      : activeTab === 'combined'
+        ? ['date','Entry Time','Type','Pair','Direction','Entry','SL Pips','Pot. R:R','Risk%','Outcome','Rating','confirmations','actions']
+        : ['date','Entry Time','Pair','Direction','Entry','SL Pips','Pot. R:R','Risk%','Outcome','Rating','confirmations','screenshot','actions']
   const headers = headerKeys.map(k => allHeaders.find(h => h.key === k || (k === 'actions' && h.label === t.actions) || (k === 'confirmations' && h.label === t.confirmations) || (k === 'screenshot' && h.label === t.screenshot)) || { label: k, key: null })
 
   if (loading) {
@@ -1284,15 +1289,51 @@ export default function Journal() {
                       const isSelected = selectedTrade?.id === trade.id
                       const badge = getOutcomeBadge(trade.outcome)
                       const showType = activeTab === 'backtest' || activeTab === 'combined'
+                      const tradePnL = computePnL(trade)
+                      const trRowStyle = {
+                        borderBottom: '1px solid var(--border)',
+                        background: isSelected ? 'var(--accent-light)' : 'transparent',
+                        cursor: 'pointer',
+                        transition: 'background 0.1s',
+                      }
+                      if (isMobile) {
+                        return (
+                          <tr key={trade.id} style={trRowStyle}
+                            onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = 'var(--card-hover)' }}
+                            onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'transparent' }}
+                            onClick={() => setSelectedTrade(isSelected ? null : trade)}
+                          >
+                            <td style={{ padding: '10px 10px', fontSize: '12px', color: 'var(--text)', whiteSpace: 'nowrap' }}>{formatDate(trade.date)}</td>
+                            <td style={{ padding: '10px 10px', fontSize: '12px', fontWeight: 500, color: 'var(--text)' }}>{trade.pair}</td>
+                            <td style={{ padding: '10px 10px' }}>
+                              <span style={{ fontSize: '11px', padding: '3px 7px', borderRadius: '5px', fontWeight: 500, background: badge.bg, color: badge.color }}>
+                                {trade.outcome}
+                              </span>
+                            </td>
+                            <td style={{ padding: '10px 10px', fontSize: '12px', fontWeight: 600, color: tradePnL >= 0 ? '#30D158' : '#FF453A' }}>
+                              {tradePnL === 0 ? '0%' : `${tradePnL >= 0 ? '+' : ''}${tradePnL.toFixed(2)}%`}
+                            </td>
+                            <td style={{ padding: '10px 10px' }} onClick={e => e.stopPropagation()}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <Link to={`/edit/${trade.id}`}
+                                  style={{ padding: '5px', borderRadius: '5px', color: 'var(--text-muted)', display: 'flex' }}
+                                  onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
+                                  onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
+                                ><EditIcon /></Link>
+                                <button onClick={() => deleteTrade(trade.id)}
+                                  style={{ padding: '5px', borderRadius: '5px', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}
+                                  onMouseEnter={e => e.currentTarget.style.color = '#f87171'}
+                                  onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
+                                ><TrashIcon /></button>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      }
                       return (
                         <tr
                           key={trade.id}
-                          style={{
-                            borderBottom: '1px solid var(--border)',
-                            background: isSelected ? 'var(--accent-light)' : 'transparent',
-                            cursor: 'pointer',
-                            transition: 'background 0.1s',
-                          }}
+                          style={trRowStyle}
                           onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = 'var(--card-hover)' }}
                           onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'transparent' }}
                           onClick={() => setSelectedTrade(isSelected ? null : trade)}

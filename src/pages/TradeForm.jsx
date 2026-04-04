@@ -261,6 +261,7 @@ function ScreenshotSlot({ label, preview, isActive, onActivate, onFile, onRemove
             ref={fileInputRef}
             type="file"
             accept="image/*"
+            capture="environment"
             style={{ display: 'none' }}
             onChange={e => onFile(e.target.files[0])}
           />
@@ -991,7 +992,7 @@ export default function TradeForm() {
                       <h2 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', marginBottom: '16px' }}>{t.direction}</h2>
                       <div style={{ display: 'flex', gap: '10px' }}>
                         {['Long', 'Short'].map(dir => (
-                          <button key={dir} type="button" onClick={() => handleField('direction', dir)} style={{ flex: 1, padding: '10px', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s', background: formData.direction === dir ? dir === 'Long' ? 'var(--long-color-bg)' : 'var(--short-color-bg)' : 'var(--bg)', border: `1px solid ${formData.direction === dir ? dir === 'Long' ? 'var(--long-color)' : 'var(--short-color)' : 'var(--border)'}`, color: formData.direction === dir ? dir === 'Long' ? 'var(--long-color)' : 'var(--short-color)' : 'var(--text-muted)' }}>
+                          <button key={dir} type="button" onClick={() => handleField('direction', dir)} style={{ flex: 1, padding: '10px', minHeight: '48px', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s', background: formData.direction === dir ? dir === 'Long' ? 'var(--long-color-bg)' : 'var(--short-color-bg)' : 'var(--bg)', border: `1px solid ${formData.direction === dir ? dir === 'Long' ? 'var(--long-color)' : 'var(--short-color)' : 'var(--border)'}`, color: formData.direction === dir ? dir === 'Long' ? 'var(--long-color)' : 'var(--short-color)' : 'var(--text-muted)' }}>
                             {dir}
                           </button>
                         ))}
@@ -1060,7 +1061,7 @@ export default function TradeForm() {
                           const c = colorMap[outcome]
                           const isActive = formData.outcome === outcome
                           return (
-                            <button key={outcome} type="button" onClick={() => handleField('outcome', outcome)} style={{ padding: '8px 16px', borderRadius: '8px', fontSize: '13px', fontWeight: 500, cursor: 'pointer', transition: 'all 0.15s', background: isActive ? c.active : 'var(--bg)', border: `1px solid ${isActive ? c.border : 'var(--border)'}`, color: isActive ? c.text : 'var(--text-muted)' }}>
+                            <button key={outcome} type="button" onClick={() => handleField('outcome', outcome)} style={{ padding: '8px 16px', minHeight: '44px', borderRadius: '8px', fontSize: '13px', fontWeight: 500, cursor: 'pointer', transition: 'all 0.15s', background: isActive ? c.active : 'var(--bg)', border: `1px solid ${isActive ? c.border : 'var(--border)'}`, color: isActive ? c.text : 'var(--text-muted)' }}>
                               {outcome}
                             </button>
                           )
@@ -1138,8 +1139,8 @@ export default function TradeForm() {
                   {sectionId === 'rating' && (
                     <div style={cardStyle}>
                       <div style={{ marginBottom: '14px' }}>
-                        <h2 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', marginBottom: '4px' }}>{t.tradeRating || 'דירוג עסקה'}</h2>
-                        <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{t.tradeRatingHint || 'כמה איכותית הייתה ההגדרה? (אופציונלי)'}</p>
+                        <h2 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', marginBottom: '4px' }}>{t.tradeRating || 'Trade Rating'}</h2>
+                        <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{t.tradeRatingHint || 'How clean was the setup? (optional)'}</p>
                       </div>
                       <StarRating value={formData.rating} onChange={val => handleField('rating', val)} size={34} />
                     </div>

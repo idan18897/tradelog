@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useIsMobile } from '../hooks/useIsMobile'
 import { Link } from 'react-router-dom'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
@@ -51,6 +52,7 @@ export default function Dashboard() {
   const { user } = useAuth()
   const { t } = useLang()
   const { accountSize, showDollarValues } = useUserSettings()
+  const isMobile = useIsMobile()
   const [trades, setTrades] = useState([])
   const [loading, setLoading] = useState(true)
   const [visible, setVisible] = useState(false)
@@ -1120,7 +1122,7 @@ export default function Dashboard() {
               <div style={{ ...cardStyle, padding: '20px', marginBottom: '20px' }}>
                 <h2 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', marginBottom: '4px' }}>Confirmations by P&L</h2>
                 <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px' }}>Which confirmations generate the most profit</p>
-                <ResponsiveContainer width="100%" height={220}>
+                <ResponsiveContainer width="100%" height={isMobile ? 170 : 220}>
                   <BarChart data={filteredConfStats.slice(0, 12)} margin={{ top: 5, right: 10, left: -10, bottom: 40 }}>
                     <XAxis dataKey="name" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} axisLine={false} tickLine={false} angle={-35} textAnchor="end" interval={0} />
                     <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `${v > 0 ? '+' : ''}${v}%`} />
@@ -1416,7 +1418,7 @@ export default function Dashboard() {
       {dashTab === 'overview' && <>
 
       {/* Stats cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px', marginBottom: '20px' }}
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: '14px', marginBottom: '20px' }}
         className="lg:grid-cols-4">
         <style>{`@media (min-width: 1024px) { .stat-grid { grid-template-columns: repeat(4, 1fr) !important; } }`}</style>
         {statCards.map(card => (
