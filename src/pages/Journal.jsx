@@ -500,6 +500,7 @@ export default function Journal() {
   const [selectedTrade, setSelectedTrade] = useState(null)
   const [activeTab, setActiveTab] = useState(() => localStorage.getItem('journal_tab') || 'live')
   const [lightbox, setLightbox] = useState(null) // { src, label }
+  const [fullDetailTrade, setFullDetailTrade] = useState(null)
   const [filterMonth, setFilterMonth] = useState('All')
   const [filterDay, setFilterDay] = useState(null)
   const [calMonth, setCalMonth] = useState(() => {
@@ -1527,36 +1528,27 @@ export default function Journal() {
                   </div>
                 )}
 
-                {/* Screenshots */}
-                {(tr.screenshot_url || tr.ltf_screenshot_url) && (
-                  <div style={{ marginBottom: '14px' }}>
-                    <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>Screenshots</p>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      {tr.screenshot_url && (
-                        <div>
-                          <p style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 600, marginBottom: '5px' }}>HTF</p>
-                          <img src={tr.screenshot_url} alt="HTF"
-                            onClick={() => setLightbox({ src: tr.screenshot_url, label: 'HTF Screenshot' })}
-                            style={{ width: '100%', maxHeight: '200px', objectFit: 'contain', borderRadius: '10px', border: '1px solid var(--border)', cursor: 'zoom-in', background: 'var(--bg)' }}
-                          />
-                        </div>
-                      )}
-                      {tr.ltf_screenshot_url && (
-                        <div>
-                          <p style={{ fontSize: '11px', color: '#60a5fa', fontWeight: 600, marginBottom: '5px' }}>LTF</p>
-                          <img src={tr.ltf_screenshot_url} alt="LTF"
-                            onClick={() => setLightbox({ src: tr.ltf_screenshot_url, label: 'LTF Screenshot' })}
-                            style={{ width: '100%', maxHeight: '200px', objectFit: 'contain', borderRadius: '10px', border: '1px solid var(--border)', cursor: 'zoom-in', background: 'var(--bg)' }}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
               </div>
 
               {/* Action buttons */}
-              <div style={{ padding: '14px 18px', borderTop: '1px solid var(--border)', display: 'flex', gap: '8px', flexShrink: 0 }}>
+              <div style={{ padding: '14px 18px', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '8px', flexShrink: 0 }}>
+                {/* View full details button */}
+                <button
+                  onClick={() => setFullDetailTrade(tr)}
+                  style={{
+                    width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                    padding: '11px', borderRadius: '10px', fontSize: '13px', fontWeight: 600,
+                    background: 'var(--bg-secondary)', color: 'var(--text)', border: '1px solid var(--border)', cursor: 'pointer', transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--card-hover)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'var(--bg-secondary)'}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+                  </svg>
+                  View Full Details
+                </button>
+                <div style={{ display: 'flex', gap: '8px' }}>
                 <Link to={`/edit/${tr.id}`} style={{
                   flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
                   padding: '10px', borderRadius: '10px', fontSize: '13px', fontWeight: 600,
@@ -1592,11 +1584,184 @@ export default function Journal() {
                     <TrashIcon />
                   </button>
                 )}
+                </div>
               </div>
             </div>
           )
         })()}
       </div>
+
+      {/* Full Detail Modal */}
+      {fullDetailTrade && (() => {
+        const tr = fullDetailTrade
+        const badge = getOutcomeBadge(tr.outcome)
+        const pnl = computePnL(tr)
+        const rr = tr.pot_rr || tr.rr_potential
+        const ht = holdingTime(tr)
+        const dollarPart = showDollarValues && accountSize
+          ? ` ($${pnl >= 0 ? '+' : ''}${((pnl / 100) * accountSize).toFixed(0)})`
+          : ''
+        return (
+          <div
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}
+            onClick={() => setFullDetailTrade(null)}
+          >
+            <div
+              style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '20px', boxShadow: '0 24px 80px rgba(0,0,0,0.5)', width: '100%', maxWidth: '640px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', animation: 'slideInRight 0.2s ease' }}
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
+                      <span style={{ fontSize: '22px', fontWeight: 750, color: 'var(--text)', letterSpacing: '-0.03em' }}>{tr.pair}</span>
+                      <span style={{ fontSize: '12px', fontWeight: 700, padding: '3px 10px', borderRadius: '20px', background: tr.direction === 'Long' ? 'var(--long-color-bg)' : 'var(--short-color-bg)', color: tr.direction === 'Long' ? 'var(--long-color)' : 'var(--short-color)' }}>{tr.direction}</span>
+                      <span style={{ fontSize: '12px', fontWeight: 600, padding: '3px 10px', borderRadius: '20px', background: badge.bg, color: badge.color }}>{tr.outcome}</span>
+                      {tr.trade_type === 'missed' && <span style={{ fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '20px', background: 'rgba(255,159,10,0.15)', color: '#FF9F0A' }}>Missed</span>}
+                    </div>
+                    <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                      {formatDate(tr.date)}{tr.day ? ` · ${tr.day}` : ''}
+                      {tr.time ? ` · ${tr.time}` : ''}{tr.exit_time ? ` → ${tr.exit_time}` : ''}
+                      {ht ? ` · ${ht}` : ''}
+                    </p>
+                    {tr.outcome !== 'Open' && tr.trade_type !== 'missed' && (
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginTop: '6px' }}>
+                        <span style={{ fontSize: '26px', fontWeight: 800, letterSpacing: '-0.04em', color: pnl >= 0 ? '#30D158' : '#FF453A' }}>{pnl >= 0 ? '+' : ''}{pnl.toFixed(2)}%</span>
+                        {dollarPart && <span style={{ fontSize: '14px', fontWeight: 600, color: pnl >= 0 ? '#30D158' : '#FF453A', opacity: 0.8 }}>{dollarPart}</span>}
+                      </div>
+                    )}
+                  </div>
+                  <button onClick={() => setFullDetailTrade(null)}
+                    style={{ padding: '6px', borderRadius: '8px', color: 'var(--text-muted)', background: 'var(--bg-secondary)', border: '1px solid var(--border)', cursor: 'pointer', display: 'flex', flexShrink: 0 }}
+                    onMouseEnter={e => { e.currentTarget.style.color = 'var(--text)'; e.currentTarget.style.background = 'var(--card-hover)' }}
+                    onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'var(--bg-secondary)' }}
+                  ><CloseIcon /></button>
+                </div>
+              </div>
+
+              {/* Modal body */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+                {/* Stats */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '18px' }}>
+                  {[
+                    { label: 'Entry', value: tr.entry ?? '--' },
+                    { label: 'SL', value: tr.sl ?? '--' },
+                    { label: 'TP', value: tr.tp ?? '--' },
+                    { label: 'SL Pips', value: tr.sl_pips ?? '--' },
+                    { label: 'R:R', value: rr ? `1:${rr}` : '--' },
+                    { label: 'Risk', value: tr.risk_pct ? `${tr.risk_pct}%` : '--' },
+                  ].map(({ label, value }) => (
+                    <div key={label} style={{ background: 'var(--bg-secondary)', borderRadius: '10px', padding: '10px 14px' }}>
+                      <p style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '3px' }}>{label}</p>
+                      <p style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text)' }}>{value}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* SL to BE */}
+                {tr.sl_to_be && (
+                  <div style={{ marginBottom: '16px', padding: '12px 14px', borderRadius: '10px', background: 'rgba(250,204,21,0.08)', border: '1px solid rgba(250,204,21,0.2)' }}>
+                    <p style={{ fontSize: '12px', color: '#facc15', fontWeight: 600, marginBottom: '4px' }}>SL → Breakeven at 1:{tr.be_at || 3}</p>
+                    {(tr.exit_levels || []).length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
+                        {tr.exit_levels.map((lvl, i) => (
+                          <span key={i} style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '6px', background: 'rgba(250,204,21,0.12)', color: '#facc15' }}>{lvl.pct}% @ 1:{lvl.rr}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Rating */}
+                {tr.rating > 0 && (
+                  <div style={{ marginBottom: '16px' }}>
+                    <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Rating</p>
+                    <MiniStars value={tr.rating} />
+                  </div>
+                )}
+
+                {/* Confirmations */}
+                {(tr.confirmations || []).length > 0 && (
+                  <div style={{ marginBottom: '16px' }}>
+                    <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Confirmations</p>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                      {tr.confirmations.map(c => (
+                        <span key={c} style={{ fontSize: '12px', padding: '4px 12px', borderRadius: '20px', background: 'rgba(129,140,248,0.15)', color: '#818cf8', fontWeight: 600 }}>{c}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Missed reason */}
+                {tr.missed_reason && (
+                  <div style={{ marginBottom: '16px' }}>
+                    <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '5px' }}>Why missed</p>
+                    <p style={{ fontSize: '13px', color: '#FF9F0A' }}>{tr.missed_reason}</p>
+                  </div>
+                )}
+
+                {/* Notes */}
+                {tr.notes && (
+                  <div style={{ marginBottom: '16px' }}>
+                    <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '5px' }}>Notes</p>
+                    <p style={{ fontSize: '13px', color: 'var(--text)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{tr.notes}</p>
+                  </div>
+                )}
+
+                {/* Screenshots */}
+                {(tr.screenshot_url || tr.ltf_screenshot_url) && (
+                  <div>
+                    <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>Screenshots</p>
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                      {tr.screenshot_url && (
+                        <div style={{ flex: 1, minWidth: '200px' }}>
+                          <p style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 600, marginBottom: '6px' }}>HTF</p>
+                          <img src={tr.screenshot_url} alt="HTF"
+                            onClick={() => { setFullDetailTrade(null); setLightbox({ src: tr.screenshot_url, label: 'HTF Screenshot' }) }}
+                            style={{ width: '100%', maxHeight: '260px', objectFit: 'contain', borderRadius: '10px', border: '1px solid var(--border)', cursor: 'zoom-in', background: 'var(--bg)' }}
+                          />
+                        </div>
+                      )}
+                      {tr.ltf_screenshot_url && (
+                        <div style={{ flex: 1, minWidth: '200px' }}>
+                          <p style={{ fontSize: '11px', color: '#60a5fa', fontWeight: 600, marginBottom: '6px' }}>LTF</p>
+                          <img src={tr.ltf_screenshot_url} alt="LTF"
+                            onClick={() => { setFullDetailTrade(null); setLightbox({ src: tr.ltf_screenshot_url, label: 'LTF Screenshot' }) }}
+                            style={{ width: '100%', maxHeight: '260px', objectFit: 'contain', borderRadius: '10px', border: '1px solid var(--border)', cursor: 'zoom-in', background: 'var(--bg)' }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                    <p style={{ fontSize: '11px', color: 'var(--text-subtle)', marginTop: '8px' }}>Click image to open full size</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal actions */}
+              <div style={{ padding: '14px 24px', borderTop: '1px solid var(--border)', display: 'flex', gap: '8px', flexShrink: 0 }}>
+                <Link to={`/edit/${tr.id}`} style={{
+                  flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                  padding: '11px', borderRadius: '10px', fontSize: '13px', fontWeight: 600,
+                  background: 'var(--accent)', color: '#fff', textDecoration: 'none', transition: 'opacity 0.15s',
+                }}
+                  onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
+                  onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+                ><EditIcon /> Edit</Link>
+                <button onClick={() => { setFullDetailTrade(null); navigate('/new', { state: { duplicate: { ...tr, id: undefined } } }) }}
+                  style={{
+                    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                    padding: '11px', borderRadius: '10px', fontSize: '13px', fontWeight: 600,
+                    background: 'var(--bg-secondary)', color: 'var(--text)', border: '1px solid var(--border)', cursor: 'pointer', transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--card-hover)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'var(--bg-secondary)'}
+                ><CopyIcon /> Duplicate</button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Lightbox */}
       {lightbox && <Lightbox src={lightbox.src} label={lightbox.label} onClose={() => setLightbox(null)} />}
