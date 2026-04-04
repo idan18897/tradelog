@@ -139,12 +139,12 @@ function Lightbox({ src, label, onClose }) {
 
   return (
     <div
-      style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.92)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
+      style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.92)', display: 'flex', flexDirection: 'column' }}
       onClick={onClose}
     >
       {/* Toolbar */}
       <div
-        style={{ position: 'fixed', top: 0, left: 0, right: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', background: 'rgba(0,0,0,0.7)', zIndex: 1001 }}
+        style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', background: 'rgba(0,0,0,0.7)' }}
         onClick={e => e.stopPropagation()}
       >
         <span style={{ color: '#fff', fontSize: '14px', fontWeight: 600 }}>{label}</span>
@@ -157,25 +157,25 @@ function Lightbox({ src, label, onClose }) {
         </div>
       </div>
 
-      {/* Image container */}
+      {/* Image container — scrollable so zoom never clips */}
       <div
         onClick={e => e.stopPropagation()}
         onWheel={handleWheel}
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', width: '92vw', height: '82vh' }}
+        style={{ flex: 1, overflow: zoom > 1 ? 'auto' : 'hidden', display: 'flex', alignItems: zoom > 1 ? 'flex-start' : 'center', justifyContent: zoom > 1 ? 'flex-start' : 'center' }}
       >
         <img
           src={src}
           alt={label}
           draggable={false}
           style={{
-            maxWidth: '100%',
-            maxHeight: '100%',
+            display: 'block',
+            maxWidth: zoom <= 1 ? '100%' : 'none',
+            maxHeight: zoom <= 1 ? '100%' : 'none',
+            width: zoom > 1 ? `${zoom * 100}%` : 'auto',
             objectFit: 'contain',
-            transform: `scale(${zoom})`,
-            transformOrigin: 'center',
-            transition: 'transform 0.1s',
             borderRadius: zoom <= 1 ? '10px' : '0',
             userSelect: 'none',
+            transition: 'width 0.1s, border-radius 0.1s',
           }}
         />
       </div>
