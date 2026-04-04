@@ -33,7 +33,7 @@ src/
     AuthContext.jsx              # Supabase auth (login/signup/logout/Google OAuth)
     ThemeContext.jsx             # Dark/light mode
     LanguageContext.jsx          # i18n translations (English only currently)
-    UserSettingsContext.jsx      # Global user settings + plan from Supabase
+    UserSettingsContext.jsx      # Global user settings + plan + goals from Supabase
   components/
     Layout.jsx                   # Shell with Sidebar + TopNav
     Sidebar.jsx                  # Navigation
@@ -43,16 +43,17 @@ src/
     UpgradeModal.jsx             # Paywall modal shown when free tier limit hit
     WelcomeModal.jsx             # Shown once after successful payment redirect
   hooks/
-    useIsMobile.js               # Responsive hook
+    useIsMobile.js               # Responsive hook (breakpoint 600px)
   pages/
     Login.jsx                    # Login + Signup (email/password + Google OAuth)
-    Dashboard.jsx                # Analytics, charts, stat cards
+    Dashboard.jsx                # Analytics, charts, stat cards, Goals widget, Streak Analysis
     Journal.jsx                  # Main hub: Live / Missed / Combined / Opportunity Log + Calendar
     TradeForm.jsx                # Add/Edit trade form (enforces free tier limit)
-    Settings.jsx                 # User settings, confirmations library, exit modes
+    Settings.jsx                 # User settings, confirmations library, exit modes, goals
     Landing.jsx                  # Public marketing page with pricing plans
   lib/
     supabase.js                  # Supabase client init
+    utils.js                     # computePnL, computeMissedPotGain
 api/
   create-checkout-session.js     # Vercel serverless: creates Stripe Checkout session
   stripe-webhook.js              # Vercel serverless: handles Stripe events → updates Supabase
@@ -154,6 +155,14 @@ supabase/
 | plan | text | "free" / "monthly" / "yearly" / "lifetime" (default: "free") |
 | stripe_customer_id | text | Stripe customer ID |
 | subscription_status | text | "active" / "canceled" / "inactive" |
+| account_size | numeric | Account size in $ for dollar value display |
+| show_dollar_values | boolean | Show ($X) next to % P&L values |
+| daily_reminder | boolean | Enable daily browser notification |
+| reminder_time | text | HH:MM for daily reminder |
+| goal_monthly_pnl | numeric | Monthly P&L target (%) |
+| goal_win_rate | numeric | Monthly win rate target (%) |
+| goal_trades_count | int | Monthly trades count target |
+| goal_avg_rr | numeric | Monthly average R:R target |
 
 ### `confirmations_library` table
 | Column | Type | Notes |
@@ -169,8 +178,8 @@ supabase/
 
 ## Key Calculation Logic
 
-### P&L Calculation (`computePnL` / `calPnL`)
-Used in Dashboard.jsx and Journal.jsx — identical logic:
+### P&L Calculation (`computePnL` in `src/lib/utils.js`)
+Used in Dashboard.jsx and Journal.jsx:
 
 ```js
 function computePnL(trade) {
@@ -216,33 +225,96 @@ function computePnL(trade) {
 - Stat cards: Win Rate, Monthly P&L, Avg R:R, Open Trades, Total Trades, Capture Rate, Profit Factor
 - Date filter: All / Current Year / Custom range
 - Toggle: include/exclude missed trades in analytics
+- **Monthly Goals widget** — shown below stat cards if any goal is set (Settings → General → Monthly Goals)
+  - Progress bars per goal, blue → green when achieved, confetti + toast on 100%
+  - Always tracks current calendar month regardless of date filter
 - Charts: Weekly P&L bar chart, Equity curve (area chart)
+- **Confirmation Analysis tab**: multi-select filter, combinations (size 2/3/4), best combo 🏆, confirmation × day heatmap
 - Performance by Day of Week, Session (London 10–14, NY 15–19), Month, Hour
-- Outcome breakdown, Winners & Losers, Consecutive streaks, Recent 5 trades
+- Outcome breakdown, Winners & Losers
+- **Streak Analysis section** (below Winners & Losers):
+  - 5 stats: Max Win Streak, Max Loss Streak, Avg Win Streak, Avg Loss Streak, Recovery Rate
+  - Pattern Analysis: after a loss / after a win / after 2+ losses (win rate cards with progress bar)
+  - Streak Timeline: bar chart of last 30 streaks (green = win, red = loss)
+- Recent 5 trades
+- PDF report export (weekly or monthly, any date)
 
 ### Journal (`/journal`)
-Four tabs: **Live | Missed | Combined | Opportunity Log**
+Three tabs: **Live | Opportunity Log | Combined**
 
 **Calendar** (shown in all tabs):
 - Month navigation with `calMonth` state (persisted to localStorage)
 - Grid: `repeat(7, 1fr) 72px` — 7 day columns + weekly summary column
 - Day cell: trade count top-right, P&L bottom-right, missed count top-left, missed % bottom-left
 - Weekly cell: live P&L (green) + missed potential (amber) separately
+- Mobile: `minHeight: 48px` per cell
 
 **Live tab:** Trade table + mini dashboard stats filtered by `calMonth`  
-**Missed tab:** Same structure for missed trades  
-**Combined tab:** Both live + missed with stat panels  
-**Opportunity Log tab:** Calendar with Trades Taken / Trades Missed panels
+**Opportunity Log tab (backtest):** liveTP + missed trades with stat panels  
+**Combined tab:** Both live + missed with stat panels
+
+**Trade table:**
+- Desktop: Date, Entry Time, Pair, Direction, Entry, SL Pips, Pot. R:R, Risk%, Outcome, Rating, Confirmations, Screenshot, Actions
+- Mobile: Date, Pair, Outcome, P&L, Actions only
+
+**Side Detail Panel:**
+- Slide-in from right, 360px wide, `position: sticky, top: 80px`
+- Mobile: full-screen overlay (`position: fixed, inset: 0`)
+- Shows pair, direction badge, outcome, P&L hero, all trade stats, confirmations, notes
+- Actions: Edit (blue), Duplicate, Delete (red)
+- "View Full Details" button opens centered modal with screenshots
+
+**Lightbox:**
+- Fullscreen, drag-to-pan, scroll-to-zoom
+- Toolbar glued directly above image (flex column layout, not floating)
+- Keyboard: Esc to close, +/- to zoom, 0 to reset
 
 ### TradeForm (`/new`, `/edit/:id`)
 - **Free tier check:** on save, if `plan === 'free'` and live trade count ≥ 10 → shows `UpgradeModal`
 - Sections (drag-to-reorder, saved to Supabase `form_section_order`):
-  `datetime`, `direction`, `prices`, `risk`, `outcome`, `sl_to_be`, `confirmations`, `rating`, `notes`, `screenshot`, `pot_rr`
+  `datetime`, `direction`, `outcome`, `prices`, `risk`, `sl_to_be`, `confirmations`, `rating`, `notes`, `screenshot`, `pot_rr`
+- Direction buttons `minHeight: 48px`, Outcome buttons `minHeight: 44px` (mobile friendly)
+- Screenshot input: `accept="image/*" capture="environment"` (opens camera on mobile)
 - Trade type toggle: Live / Missed
 
 ### Settings (`/settings`)
-Sections (drag-to-reorder, saved to `settings_section_order`):
-- Confirmations Library, Exit Modes, Pairs, Account, Theme/Language
+Tabs: **Trading | General | Account**
+
+**Trading tab** — drag-to-reorder sections:
+- Confirmations Library, Pairs Library, Default Risk %, Exit Modes
+
+**General tab:**
+- Account Size + Show Dollar Values toggle
+- Daily Trade Reminder (browser notification)
+- Direction Colors (Long/Short custom hex color pickers)
+- Trade Templates
+- **Monthly Goals** — 4 inputs: Monthly P&L Target (%), Win Rate Target (%), Trades Count Target, Avg R:R Target
+  - Clear (✕) button per goal, saved to Supabase on Save
+
+**Account tab:** Email display, Change Password
+
+---
+
+## Goals & Targets System
+
+### Setup
+Requires 4 SQL migrations in Supabase:
+```sql
+ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS goal_monthly_pnl numeric;
+ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS goal_win_rate numeric;
+ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS goal_trades_count int;
+ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS goal_avg_rr numeric;
+```
+
+### Flow
+1. User sets goals in Settings → General → Monthly Goals → Save
+2. Dashboard reads goals from `UserSettingsContext`
+3. Monthly Goals widget shows progress bars (current month only, ignores date filter)
+4. When any goal hits 100%: confetti animation (80 pieces, 4.5s) + gradient toast
+5. Achievement tracked in `achievedGoalsRef` — won't re-fire until goal dips below 100%
+
+### Goal columns fetched separately in UserSettingsContext
+Goal columns are fetched in a **separate Supabase query** so a missing-column error never breaks main settings (colors, plan, etc.)
 
 ---
 
@@ -268,13 +340,25 @@ Saved in `user_settings.exit_modes` as JSONB:
 | State | Where saved |
 |-------|------------|
 | activeTab (Journal) | localStorage (`journal_tab`) |
-| calMonth (Journal) | localStorage (`journal_cal_month`) |
+| calMonth (Journal) | localStorage (`journal_calMonth`) |
 | form_section_order | localStorage + Supabase `user_settings` |
 | settings_section_order | localStorage + Supabase `user_settings` |
 | Theme | localStorage + Supabase `user_settings` |
 | Exit modes | Supabase `user_settings.exit_modes` |
 | Confirmations | Supabase `confirmations_library` table |
 | plan / subscription | Supabase `user_settings` (updated by Stripe webhook) |
+| Monthly goals | Supabase `user_settings` (goal_monthly_pnl etc.) |
+
+---
+
+## Mobile Responsiveness
+- `useIsMobile()` hook at breakpoint 600px, used in Dashboard, Journal, TradeForm
+- Dashboard: stat cards 1-column, charts height 170px on mobile
+- Journal calendar: `minHeight: 48px` per cell (vs 72px desktop)
+- Journal table: mobile shows only Date / Pair / Outcome / P&L / Actions
+- TradeForm: direction buttons `minHeight: 48px`, outcome buttons `minHeight: 44px`
+- TradeForm screenshots: `capture="environment"` for mobile camera
+- **Important:** `useIsMobile()` must be declared inside each component that uses it — not passed as prop
 
 ---
 
@@ -285,6 +369,8 @@ Saved in `user_settings.exit_modes` as JSONB:
 - All P&L values are in **% of account** (not absolute $)
 - `calMonth` format: `"YYYY-MM"` string
 - `inCalMonth = t => t.date?.slice(0, 7) === calMonth` — standard filter used everywhere
+- **No Hebrew text in the UI** — the user writes in Hebrew but all UI strings must be English
+- Goal columns must be fetched in a **separate query** from main settings to avoid crashing on missing columns
 
 ---
 
@@ -299,6 +385,14 @@ ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS short_color text;
 ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS plan text DEFAULT 'free';
 ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS stripe_customer_id text;
 ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS subscription_status text DEFAULT 'inactive';
+ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS account_size numeric DEFAULT 10000;
+ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS show_dollar_values boolean DEFAULT false;
+ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS daily_reminder boolean DEFAULT false;
+ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS reminder_time text DEFAULT '20:00';
+ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS goal_monthly_pnl numeric;
+ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS goal_win_rate numeric;
+ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS goal_trades_count int;
+ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS goal_avg_rr numeric;
 -- handle_new_user() uses SECURITY DEFINER to bypass RLS
 ```
 
@@ -310,3 +404,6 @@ ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS subscription_status text DEFA
 - Supabase free tier: 3 signups/hour rate limit on email confirmation
 - Stripe is currently in **Test Mode** — use card `4242 4242 4242 4242` to test payments
 - `exit_time` field exists in DB and TradeForm but not yet used in analytics
+- Journal is wrapped in `JournalErrorBoundary` — runtime crashes show error message instead of black screen
+- Streak Analysis requires ≥3 closed trades (TP/Partial TP/SL/BE) to appear
+- Monthly Goals widget requires SQL migrations + at least one goal saved in Settings
