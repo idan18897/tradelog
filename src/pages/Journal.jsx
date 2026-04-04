@@ -234,6 +234,7 @@ const CAL_DAY_HEADERS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 // secondaryTrades = missed trades shown in amber overlay (optional)
 function TradeCalendar({ trades, secondaryTrades, calMonth, onMonthChange, filterDay, onDayClick }) {
+  const isMobile = useIsMobile()
   const [year, month] = calMonth.split('-').map(Number)
   const firstDay = new Date(year, month - 1, 1)
   const daysInMonth = new Date(year, month, 0).getDate()
