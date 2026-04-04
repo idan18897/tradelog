@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
@@ -107,12 +107,24 @@ function MiniStars({ value }) {
 
 function Lightbox({ src, label, onClose }) {
   const [zoom, setZoom] = useState(1)
+  const [pan, setPan] = useState({ x: 0, y: 0 })
+  const [dragging, setDragging] = useState(false)
+  const dragStart = useRef(null)
+
+  const changeZoom = useCallback((delta, cx, cy) => {
+    setZoom(prev => {
+      const next = Math.min(8, Math.max(1, parseFloat((prev + delta).toFixed(2))))
+      if (next === 1) setPan({ x: 0, y: 0 })
+      return next
+    })
+  }, [])
 
   const handleKey = useCallback(e => {
     if (e.key === 'Escape') onClose()
-    if (e.key === '+' || e.key === '=') setZoom(z => Math.min(5, +(z + 0.25).toFixed(2)))
-    if (e.key === '-') setZoom(z => Math.max(0.25, +(z - 0.25).toFixed(2)))
-  }, [onClose])
+    if (e.key === '+' || e.key === '=') changeZoom(0.5)
+    if (e.key === '-') changeZoom(-0.5)
+    if (e.key === '0') { setZoom(1); setPan({ x: 0, y: 0 }) }
+  }, [onClose, changeZoom])
 
   useEffect(() => {
     window.addEventListener('keydown', handleKey)
@@ -121,68 +133,88 @@ function Lightbox({ src, label, onClose }) {
 
   function handleWheel(e) {
     e.preventDefault()
-    const delta = e.deltaY < 0 ? 0.12 : -0.12
-    setZoom(z => Math.min(5, Math.max(0.25, +(z + delta).toFixed(2))))
+    changeZoom(e.deltaY < 0 ? 0.3 : -0.3)
   }
 
-  const toolBtn = {
-    background: 'rgba(255,255,255,0.1)',
-    border: '1px solid rgba(255,255,255,0.2)',
-    color: '#fff',
-    padding: '5px 14px',
-    borderRadius: '7px',
-    cursor: 'pointer',
-    fontSize: '15px',
-    fontWeight: 600,
-    lineHeight: 1,
+  function handleMouseDown(e) {
+    if (zoom <= 1) return
+    e.preventDefault()
+    setDragging(true)
+    dragStart.current = { x: e.clientX - pan.x, y: e.clientY - pan.y }
+  }
+
+  function handleMouseMove(e) {
+    if (!dragging || !dragStart.current) return
+    setPan({ x: e.clientX - dragStart.current.x, y: e.clientY - dragStart.current.y })
+  }
+
+  function handleMouseUp() {
+    setDragging(false)
+    dragStart.current = null
+  }
+
+  const btnStyle = {
+    background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)',
+    color: '#fff', padding: '6px 14px', borderRadius: '8px', cursor: 'pointer',
+    fontSize: '14px', fontWeight: 600, lineHeight: 1, transition: 'background 0.15s',
   }
 
   return (
     <div
-      style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.92)', display: 'flex', flexDirection: 'column' }}
+      style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,0.95)', display: 'flex', flexDirection: 'column' }}
       onClick={onClose}
     >
       {/* Toolbar */}
       <div
-        style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', background: 'rgba(0,0,0,0.7)' }}
+        style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)' }}
         onClick={e => e.stopPropagation()}
       >
-        <span style={{ color: '#fff', fontSize: '14px', fontWeight: 600 }}>{label}</span>
+        <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '14px', fontWeight: 600 }}>{label}</span>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <button style={toolBtn} onClick={() => setZoom(z => Math.min(5, +(z + 0.25).toFixed(2)))}>+</button>
-          <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px', minWidth: '46px', textAlign: 'center' }}>{Math.round(zoom * 100)}%</span>
-          <button style={toolBtn} onClick={() => setZoom(z => Math.max(0.25, +(z - 0.25).toFixed(2)))}>−</button>
-          <button style={{ ...toolBtn, color: 'rgba(255,255,255,0.5)', fontSize: '13px' }} onClick={() => setZoom(1)}>Reset</button>
-          <button style={{ ...toolBtn, color: '#f87171', borderColor: 'rgba(248,113,113,0.4)', fontSize: '13px' }} onClick={onClose}>✕ Close</button>
+          <button style={btnStyle} onClick={() => changeZoom(0.5)}>+</button>
+          <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', minWidth: '44px', textAlign: 'center' }}>{Math.round(zoom * 100)}%</span>
+          <button style={btnStyle} onClick={() => changeZoom(-0.5)}>−</button>
+          <button style={{ ...btnStyle, color: 'rgba(255,255,255,0.5)', fontSize: '13px' }} onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }}>Reset</button>
+          <button
+            style={{ ...btnStyle, background: 'rgba(255,69,58,0.2)', borderColor: 'rgba(255,69,58,0.4)', color: '#FF453A' }}
+            onClick={onClose}
+          >✕ Close</button>
         </div>
       </div>
 
-      {/* Image container — scrollable so zoom never clips */}
+      {/* Image area */}
       <div
+        style={{ flex: 1, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: zoom > 1 ? (dragging ? 'grabbing' : 'grab') : 'default' }}
         onClick={e => e.stopPropagation()}
         onWheel={handleWheel}
-        style={{ flex: 1, overflow: zoom > 1 ? 'auto' : 'hidden', display: 'flex', alignItems: zoom > 1 ? 'flex-start' : 'center', justifyContent: zoom > 1 ? 'flex-start' : 'center' }}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
       >
         <img
           src={src}
           alt={label}
           draggable={false}
           style={{
-            display: 'block',
-            maxWidth: zoom <= 1 ? '100%' : 'none',
-            maxHeight: zoom <= 1 ? '100%' : 'none',
-            width: zoom > 1 ? `${zoom * 100}%` : 'auto',
+            maxWidth: '96vw',
+            maxHeight: '90vh',
             objectFit: 'contain',
-            borderRadius: zoom <= 1 ? '10px' : '0',
+            transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
+            transformOrigin: 'center center',
+            transition: dragging ? 'none' : 'transform 0.15s ease',
+            borderRadius: zoom <= 1 ? '8px' : '0',
             userSelect: 'none',
-            transition: 'width 0.1s, border-radius 0.1s',
+            pointerEvents: 'none',
           }}
         />
       </div>
 
-      <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px', marginTop: '16px' }}>
-        Scroll to zoom · ESC to close · Click outside to close
-      </p>
+      {zoom === 1 && (
+        <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.25)', fontSize: '11px', padding: '8px 0 12px' }}>
+          Scroll or +/− to zoom · Drag to pan · ESC to close
+        </p>
+      )}
     </div>
   )
 }
