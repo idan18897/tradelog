@@ -42,9 +42,10 @@ export function UserSettingsProvider({ children }) {
 
   useEffect(() => {
     if (!user) return
+    // Main settings — columns that always exist
     supabase
       .from('user_settings')
-      .select('long_color, short_color, plan, account_size, show_dollar_values, daily_reminder, reminder_time, goal_monthly_pnl, goal_win_rate, goal_trades_count, goal_avg_rr')
+      .select('long_color, short_color, plan, account_size, show_dollar_values, daily_reminder, reminder_time')
       .eq('user_id', user.id)
       .maybeSingle()
       .then(({ data }) => {
@@ -58,10 +59,19 @@ export function UserSettingsProvider({ children }) {
         if (data?.show_dollar_values != null) setShowDollarValues(data.show_dollar_values)
         if (data?.daily_reminder != null) setDailyReminder(data.daily_reminder)
         if (data?.reminder_time) setReminderTime(data.reminder_time)
-        if (data?.goal_monthly_pnl != null) setGoalMonthlyPnl(data.goal_monthly_pnl)
-        if (data?.goal_win_rate != null) setGoalWinRate(data.goal_win_rate)
-        if (data?.goal_trades_count != null) setGoalTradesCount(data.goal_trades_count)
-        if (data?.goal_avg_rr != null) setGoalAvgRR(data.goal_avg_rr)
+      })
+    // Goal columns — loaded separately so a missing column never breaks main settings
+    supabase
+      .from('user_settings')
+      .select('goal_monthly_pnl, goal_win_rate, goal_trades_count, goal_avg_rr')
+      .eq('user_id', user.id)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error || !data) return
+        if (data.goal_monthly_pnl != null) setGoalMonthlyPnl(data.goal_monthly_pnl)
+        if (data.goal_win_rate != null) setGoalWinRate(data.goal_win_rate)
+        if (data.goal_trades_count != null) setGoalTradesCount(data.goal_trades_count)
+        if (data.goal_avg_rr != null) setGoalAvgRR(data.goal_avg_rr)
       })
   }, [user])
 
