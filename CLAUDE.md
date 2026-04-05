@@ -53,7 +53,7 @@ src/
     Landing.jsx                  # Public marketing page with pricing plans
   lib/
     supabase.js                  # Supabase client init
-    utils.js                     # computePnL, computeMissedPotGain
+    utils.js                     # computePnL(trade), computeMissedPotGain(trade) — shared across Dashboard + Journal
 api/
   create-checkout-session.js     # Vercel serverless: creates Stripe Checkout session
   stripe-webhook.js              # Vercel serverless: handles Stripe events → updates Supabase
@@ -220,6 +220,12 @@ function computePnL(trade) {
 ### R:R Display Priority
 - **Calculations:** always use `rr_potential` (auto-calculated from prices)
 - **Display (table/detail panel):** always show `pot_rr || rr_potential`
+
+---
+
+## Shared Utilities (`src/lib/utils.js`)
+`computePnL` and `computeMissedPotGain` are defined **once** in `utils.js` and imported wherever needed.
+Never redefine these functions inline in components.
 
 ---
 
@@ -495,14 +501,62 @@ ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS instrument_type text DEFAULT 
 
 ---
 
+## Features Implemented
+
+### Analytics & Dashboard
+- Win Rate, Monthly P&L, Avg R:R, Open Trades, Total Trades, Capture Rate, Profit Factor
+- Expectancy per Trade, Max Drawdown, Risk of Ruin, Average Holding Time
+- Equity Curve, Weekly P&L chart, Performance by Hour/Day/Month/Session/Pair/Holding Time
+- Outcome Breakdown, Winners & Losers, Streak Analysis (with pattern analysis + timeline)
+- Trading Insights — auto-generated text insights from trade data
+- Monthly Goals widget with progress bars + confetti animation
+- Export PDF Report (Weekly/Monthly)
+
+### Journal
+- Live / Missed / Combined / Opportunity Log tabs
+- Calendar with weekly summary column
+- Trade table with sort, filters (pair/outcome/direction/rating), search, Export CSV
+- Trade Detail Panel (slide-in) with screenshots lightbox
+- Duplicate Trade button
+
+### TradeForm
+- Instrument type toggle (Forex / Stocks / Indices) with dynamic field labels
+- Save as Template + Load Template dropdown
+- Drag-to-reorder sections
+- HTF + LTF screenshot upload (drag/drop/paste/camera)
+- SL to Breakeven toggle + Exit Modes presets
+
+### Settings
+- Confirmations Library (add/edit/delete/reorder)
+- Categorized Pairs Library (pairs_v2) with custom categories
+- Exit Modes presets
+- Default Pair, Default Outcome, Default Risk %
+- Default Instrument Type
+- Account Size + Show Dollar Values toggle
+- Direction Colors (Long/Short custom colors)
+- Monthly Goals (4 targets)
+- Daily Trade Reminder (browser notification)
+- Trade Templates management
+- Cancel Subscription / Upgrade Plan
+
+### Infrastructure
+- Stripe payments (Monthly $14.99 / Yearly $99 / Lifetime $199)
+- Free tier enforcement (10 live trades)
+- UpgradeModal + WelcomeModal
+- Mobile responsive (breakpoint 600px)
+- Dark/Light mode (soft palette — not pure black/white)
+- Google OAuth + email/password auth
+
+---
+
 ## Known Issues / Notes
 - Browser caching on Vercel: if a change doesn't appear, open in Incognito mode
 - `rr_potential` is auto-calculated on save from entry/SL/TP; doesn't auto-update if prices change post-save
 - Supabase free tier: 3 signups/hour rate limit on email confirmation
 - Stripe is currently in **Test Mode** — use card `4242 4242 4242 4242` to test payments
-- `exit_time` field exists in DB and TradeForm but not yet used in analytics
+- `exit_time` is used in Holding Time analytics and Trade Detail Panel
+- Instrument type fields (shares, contracts, point_value) saved to DB but not yet used in P&L calculations
 - Journal is wrapped in `JournalErrorBoundary` — runtime crashes show error message instead of black screen
 - Streak Analysis requires ≥3 closed trades (TP/Partial TP/SL/BE) to appear
 - Monthly Goals widget requires SQL migrations + at least one goal saved in Settings
 - Trading Insights require minimum 3 trades per data point to appear
-- Instrument type fields (shares, contracts, point_value) are saved to DB but not yet used in P&L calculations — current P&L is always % based on risk_pct
