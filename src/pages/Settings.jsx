@@ -102,7 +102,7 @@ function SortableItem({ item, onDelete }) {
 export default function Settings() {
   const { user } = useAuth()
   const { t } = useLang()
-  const { updateColors, accountSize: ctxAccountSize, setAccountSize: ctxSetAccountSize, showDollarValues: ctxShowDollar, setShowDollarValues: ctxSetShowDollar, dailyReminder: ctxDailyReminder, setDailyReminder: ctxSetDailyReminder, reminderTime: ctxReminderTime, setReminderTime: ctxSetReminderTime, setGoalMonthlyPnl: ctxSetGoalMonthlyPnl, setGoalWinRate: ctxSetGoalWinRate, setGoalTradesCount: ctxSetGoalTradesCount, setGoalAvgRR: ctxSetGoalAvgRR } = useUserSettings()
+  const { updateColors, plan, accountSize: ctxAccountSize, setAccountSize: ctxSetAccountSize, showDollarValues: ctxShowDollar, setShowDollarValues: ctxSetShowDollar, dailyReminder: ctxDailyReminder, setDailyReminder: ctxSetDailyReminder, reminderTime: ctxReminderTime, setReminderTime: ctxSetReminderTime, setGoalMonthlyPnl: ctxSetGoalMonthlyPnl, setGoalWinRate: ctxSetGoalWinRate, setGoalTradesCount: ctxSetGoalTradesCount, setGoalAvgRR: ctxSetGoalAvgRR } = useUserSettings()
   const [accountSize, setAccountSizeLocal] = useState(ctxAccountSize || 10000)
   const [showDollarValues, setShowDollarValuesLocal] = useState(ctxShowDollar || false)
   const [dailyReminder, setDailyReminderLocal] = useState(ctxDailyReminder || false)
@@ -170,6 +170,7 @@ export default function Settings() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [pwError, setPwError] = useState('')
   const [pwLoading, setPwLoading] = useState(false)
+  const [cancelLoading, setCancelLoading] = useState(false)
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -237,6 +238,25 @@ export default function Settings() {
       ))
       showToast(t.saved)
     } finally { setSaving(false) }
+  }
+
+  async function handleCancelSubscription() {
+    if (!window.confirm("Are you sure? You'll lose access at the end of your current billing period.")) return
+    setCancelLoading(true)
+    try {
+      const res = await fetch('/api/cancel-subscription', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to cancel')
+      showToast('✓ Subscription canceled — access continues until end of billing period')
+    } catch (err) {
+      showToast('❌ ' + err.message)
+    } finally {
+      setCancelLoading(false)
+    }
   }
 
   async function handleChangePassword() {
@@ -1106,6 +1126,67 @@ export default function Settings() {
       </div>}
 
       {activeTab === 'account' && (<>
+
+      {/* ── Subscription ── */}
+      <div style={cardStyle}>
+        <p style={sectionTitle}>Subscription</p>
+        {plan === 'free' && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+            <div>
+              <p style={{ fontSize: '14px', color: 'var(--text)', fontWeight: 600, marginBottom: '2px' }}>Free Plan</p>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Limited to 10 live trades</p>
+            </div>
+            <a
+              href="/landing"
+              style={{
+                padding: '9px 20px', borderRadius: '10px', fontSize: '14px', fontWeight: 700,
+                background: 'var(--accent)', color: '#fff', textDecoration: 'none',
+                boxShadow: '0 4px 16px rgba(10,132,255,0.3)', transition: 'opacity 0.15s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
+              onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+            >
+              Upgrade Plan →
+            </a>
+          </div>
+        )}
+        {(plan === 'monthly' || plan === 'yearly') && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#30D158', display: 'inline-block' }} />
+                <p style={{ fontSize: '14px', color: 'var(--text)', fontWeight: 600 }}>
+                  {plan === 'monthly' ? 'Monthly Plan' : 'Yearly Plan'}
+                </p>
+              </div>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Active subscription — unlimited trades</p>
+            </div>
+            <button
+              onClick={handleCancelSubscription}
+              disabled={cancelLoading}
+              style={{
+                padding: '8px 18px', borderRadius: '10px', fontSize: '13px', fontWeight: 600,
+                border: '1px solid rgba(248,113,113,0.4)', background: 'rgba(248,113,113,0.08)',
+                color: '#f87171', cursor: cancelLoading ? 'not-allowed' : 'pointer',
+                opacity: cancelLoading ? 0.6 : 1, transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { if (!cancelLoading) { e.currentTarget.style.background = 'rgba(248,113,113,0.15)'; e.currentTarget.style.borderColor = '#f87171' } }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(248,113,113,0.08)'; e.currentTarget.style.borderColor = 'rgba(248,113,113,0.4)' }}
+            >
+              {cancelLoading ? 'Canceling...' : 'Cancel Subscription'}
+            </button>
+          </div>
+        )}
+        {plan === 'lifetime' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '20px' }}>✓</span>
+            <div>
+              <p style={{ fontSize: '14px', color: '#30D158', fontWeight: 700, marginBottom: '2px' }}>Lifetime Access</p>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>One-time purchase — never expires</p>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* ── Account ── */}
       <div style={cardStyle}>
