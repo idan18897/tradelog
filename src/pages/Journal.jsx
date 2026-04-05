@@ -1454,7 +1454,7 @@ function JournalInner() {
                                 onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
                                 onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
                               ><EditIcon /></Link>
-                              {(activeTab === 'live' || activeTab === 'combined' || trade.trade_type === 'missed') && (
+                              {(activeTab === 'live' || activeTab === 'combined' || activeTab === 'backtest' || trade.trade_type === 'missed') && (
                                 <button onClick={() => deleteTrade(trade.id)}
                                   style={{ padding: '5px', borderRadius: '5px', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}
                                   onMouseEnter={e => e.currentTarget.style.color = '#f87171'}
