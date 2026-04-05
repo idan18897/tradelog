@@ -27,7 +27,7 @@ A personal trading journal web app with a paid subscription model. Users log liv
 ```
 src/
   App.jsx                        # Routes + Providers + WelcomeModal trigger
-  index.css                      # Global styles, CSS variables
+  index.css                      # Global styles, CSS variables (dark/light)
   main.jsx
   context/
     AuthContext.jsx              # Supabase auth (login/signup/logout/Google OAuth)
@@ -46,10 +46,10 @@ src/
     useIsMobile.js               # Responsive hook (breakpoint 600px)
   pages/
     Login.jsx                    # Login + Signup (email/password + Google OAuth)
-    Dashboard.jsx                # Analytics, charts, stat cards, Goals widget, Streak Analysis
-    Journal.jsx                  # Main hub: Live / Missed / Combined / Opportunity Log + Calendar
-    TradeForm.jsx                # Add/Edit trade form (enforces free tier limit)
-    Settings.jsx                 # User settings, confirmations library, exit modes, goals
+    Dashboard.jsx                # Analytics, charts, stat cards, Goals widget, Streak Analysis, Trading Insights
+    Journal.jsx                  # Main hub: Live / Opportunity Log / Combined + Calendar + search
+    TradeForm.jsx                # Add/Edit trade form (enforces free tier limit, instrument type toggle)
+    Settings.jsx                 # User settings, categorized pairs library, exit modes, goals
     Landing.jsx                  # Public marketing page with pricing plans
   lib/
     supabase.js                  # Supabase client init
@@ -122,7 +122,7 @@ supabase/
 | entry | numeric | Entry price |
 | sl | numeric | Stop loss price |
 | tp | numeric | Take profit price |
-| sl_pips | numeric | SL in pips |
+| sl_pips | numeric | SL in pips (or $ for stocks, points for indices) |
 | rr_potential | numeric | Auto-calculated from entry/SL/TP prices |
 | pot_rr | numeric | Manually entered estimated R:R |
 | risk_pct | numeric | Risk % (default 0.5) |
@@ -138,6 +138,10 @@ supabase/
 | sl_to_be | boolean | Whether SL moved to breakeven |
 | be_at | numeric | R:R level when SL moved to BE (default 3) |
 | exit_levels | jsonb | Array of `{pct: number, rr: number}` — partial exit levels |
+| instrument_type | text | "forex" (default) / "stocks" / "indices" |
+| shares | numeric | Number of shares (stocks mode) |
+| contracts | numeric | Number of contracts (indices mode) |
+| point_value | numeric | Dollar value per point (indices mode) |
 
 ### `user_settings` table
 | Column | Type | Notes |
@@ -146,7 +150,12 @@ supabase/
 | theme | text | "dark" / "light" |
 | language | text | |
 | default_risk | numeric | |
-| default_pair | text | |
+| default_pair | text | Pre-selected pair for new trades |
+| default_outcome | text | Pre-selected outcome for new trades |
+| default_risk_pct | numeric | Pre-filled risk % for new trades |
+| instrument_type | text | Default instrument mode: "forex" / "stocks" / "indices" |
+| pairs | jsonb | Flat array of symbols (legacy + sync) |
+| pairs_v2 | jsonb | Categorized: `[{category, symbols: []}]` |
 | exit_modes | jsonb | Array of `{name, be_at, levels: [{pct, rr}]}` |
 | settings_section_order | jsonb | Order of sections in Settings page |
 | form_section_order | jsonb | Order of sections in TradeForm |
@@ -222,20 +231,30 @@ function computePnL(trade) {
 - Unauthenticated users are redirected to `/login` before checkout
 
 ### Dashboard (`/`)
-- Stat cards: Win Rate, Monthly P&L, Avg R:R, Open Trades, Total Trades, Capture Rate, Profit Factor
-- Date filter: All / Current Year / Custom range
+- **Date filter:** All Time | Monthly | Yearly | Custom Dates
+  - Default on load: **Monthly** (current month)
+  - Monthly / Yearly modes show a `← April 2026 →` navigation row
+  - Click on month/year label to jump back to current
+  - `navOffset` state controls period offset (0 = current)
+- Stat cards: Win Rate, Monthly P&L, Avg R:R, Open Trades, Total Trades, Capture Rate, Profit Factor, Avg Hold Time, Expectancy, Max Drawdown, Risk of Ruin
 - Toggle: include/exclude missed trades in analytics
 - **Monthly Goals widget** — shown below stat cards if any goal is set (Settings → General → Monthly Goals)
   - Progress bars per goal, blue → green when achieved, confetti + toast on 100%
-  - Always tracks current calendar month regardless of date filter
+  - Always tracks **current calendar month** regardless of date filter
+  - Achievement tracked in `achievedGoalsRef` — won't re-fire until goal dips below 100%
 - Charts: Weekly P&L bar chart, Equity curve (area chart)
 - **Confirmation Analysis tab**: multi-select filter, combinations (size 2/3/4), best combo 🏆, confirmation × day heatmap
-- Performance by Day of Week, Session (London 10–14, NY 15–19), Month, Hour
+- Performance by Day of Week, Session (London 10–14, NY 15–19), Month, Hour, Pair, Holding Time
 - Outcome breakdown, Winners & Losers
 - **Streak Analysis section** (below Winners & Losers):
   - 5 stats: Max Win Streak, Max Loss Streak, Avg Win Streak, Avg Loss Streak, Recovery Rate
   - Pattern Analysis: after a loss / after a win / after 2+ losses (win rate cards with progress bar)
   - Streak Timeline: bar chart of last 30 streaks (green = win, red = loss)
+- **Trading Insights** — auto-generated at bottom of Overview tab
+  - 9 possible insights (best day, best pair, worst pair, confirmations, streaks, etc.)
+  - Sorted by impact score, max 6 shown
+  - Text rendered with `dangerouslySetInnerHTML` — `<b>` tags become blue spans
+  - "pure math, no AI" — data-driven only, min 3 trades per data point
 - Recent 5 trades
 - PDF report export (weekly or monthly, any date)
 
@@ -254,8 +273,12 @@ Three tabs: **Live | Opportunity Log | Combined**
 **Combined tab:** Both live + missed with stat panels
 
 **Trade table:**
+- **Search bar** above filters — real-time search by Pair, Outcome, Direction, Notes, Confirmations
+  - 🔍 icon inside input, ✕ clear button, "No trades found for `...`" empty state
+- Filters: Pair, Outcome, Direction, Rating, Type, Date range
 - Desktop: Date, Entry Time, Pair, Direction, Entry, SL Pips, Pot. R:R, Risk%, Outcome, Rating, Confirmations, Screenshot, Actions
 - Mobile: Date, Pair, Outcome, P&L, Actions only
+- Delete button available in all tabs (including live trades in Opportunity Log)
 
 **Side Detail Panel:**
 - Slide-in from right, 360px wide, `position: sticky, top: 80px`
@@ -269,19 +292,38 @@ Three tabs: **Live | Opportunity Log | Combined**
 - Toolbar glued directly above image (flex column layout, not floating)
 - Keyboard: Esc to close, +/- to zoom, 0 to reset
 
+**Error handling:** Journal wrapped in `JournalErrorBoundary` — runtime crashes show error message instead of black screen.
+
 ### TradeForm (`/new`, `/edit/:id`)
 - **Free tier check:** on save, if `plan === 'free'` and live trade count ≥ 10 → shows `UpgradeModal`
+- **Instrument Type toggle** at top of form (persisted per-trade):
+  - 💱 Forex / Metals / Crypto (default) — SL label: "SL Pips", auto-calculated
+  - 📈 Stocks / ETFs — SL label: "SL ($)", adds **Shares** field
+  - 📊 Indices / Futures — SL label: "SL Points", adds **Contracts** + **Point Value ($)** fields
+- **Pair dropdown** — searchable, grouped by category (Forex, Metals, Indices, etc.)
+  - Custom dropdown with free-text search, not native `<select>`
 - Sections (drag-to-reorder, saved to Supabase `form_section_order`):
   `datetime`, `direction`, `outcome`, `prices`, `risk`, `sl_to_be`, `confirmations`, `rating`, `notes`, `screenshot`, `pot_rr`
 - Direction buttons `minHeight: 48px`, Outcome buttons `minHeight: 44px` (mobile friendly)
 - Screenshot input: `accept="image/*" capture="environment"` (opens camera on mobile)
 - Trade type toggle: Live / Missed
+- Loads defaults from user_settings: `default_pair`, `default_risk_pct`, `default_outcome`, `instrument_type`
 
 ### Settings (`/settings`)
 Tabs: **Trading | General | Account**
 
 **Trading tab** — drag-to-reorder sections:
-- Confirmations Library, Pairs Library, Default Risk %, Exit Modes
+- **Confirmations Library** — drag to reorder, delete, add new
+- **Pairs Library** — categorized by instrument type:
+  - 7 default categories: Forex, Metals, Indices, Commodities, Crypto, Stocks, ETFs
+  - Add/remove symbols per category
+  - Add/remove custom categories
+  - Saved as `pairs_v2` JSONB; flat `pairs` also updated for backward compat
+- **Default Risk %** — pre-filled in every new trade
+- **Default Outcome** — pre-selected outcome in every new trade
+- **Default Pair** — pre-selected pair, shown as grouped `<optgroup>` dropdown
+- **Default Instrument Type** — 3 buttons: 💱 Forex · 📈 Stocks · 📊 Indices
+- **Exit Modes** — define partial exit presets
 
 **General tab:**
 - Account Size + Show Dollar Values toggle
@@ -297,15 +339,6 @@ Tabs: **Trading | General | Account**
 
 ## Goals & Targets System
 
-### Setup
-Requires 4 SQL migrations in Supabase:
-```sql
-ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS goal_monthly_pnl numeric;
-ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS goal_win_rate numeric;
-ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS goal_trades_count int;
-ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS goal_avg_rr numeric;
-```
-
 ### Flow
 1. User sets goals in Settings → General → Monthly Goals → Save
 2. Dashboard reads goals from `UserSettingsContext`
@@ -315,6 +348,37 @@ ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS goal_avg_rr numeric;
 
 ### Goal columns fetched separately in UserSettingsContext
 Goal columns are fetched in a **separate Supabase query** so a missing-column error never breaks main settings (colors, plan, etc.)
+
+---
+
+## Instrument Types System
+
+Three modes that change the TradeForm UI:
+
+| Mode | Key | SL Label | Extra Fields |
+|------|-----|----------|-------------|
+| Forex / Metals / Crypto | `forex` | SL Pips (auto) | — |
+| Stocks / ETFs | `stocks` | SL ($) | Shares |
+| Indices / Futures | `indices` | SL Points | Contracts, Point Value ($) |
+
+- Saved to `trades.instrument_type`, `trades.shares`, `trades.contracts`, `trades.point_value`
+- Default instrument type saved in `user_settings.instrument_type`
+- P&L calculation is unchanged — always uses `rr_potential × risk_pct`
+
+---
+
+## Pairs Library v2
+
+Pairs organized in categories, stored as `user_settings.pairs_v2`:
+```json
+[
+  { "category": "Forex", "symbols": ["EURUSD", "GBPUSD"] },
+  { "category": "Metals", "symbols": ["XAUUSD"] }
+]
+```
+- Legacy flat `pairs` array still updated on every save (backward compat with Journal/Dashboard)
+- TradeForm loads `pairs_v2` first; falls back to flat `pairs`
+- TradeForm pair dropdown is a custom searchable dropdown (not native `<select>`)
 
 ---
 
@@ -336,6 +400,24 @@ Saved in `user_settings.exit_modes` as JSONB:
 
 ---
 
+## Theme / Colors
+
+### Dark Mode (`[data-theme="dark"]`)
+Deep gray palette — not pure black:
+- `--bg: #111113` | `--bg-secondary: #242428`
+- `--card: #1E1E22` | `--card-hover: #2A2A2E`
+- `--sidebar-bg: #161618`
+
+### Light Mode (`:root`)
+Soft macOS gray — not pure white:
+- `--bg: #F2F2F7` | `--bg-secondary: #E5E5EA`
+- `--card: #FFFFFF`
+- `--text: #1C1C1E`
+
+Accent colors (blue, green, red) are **never changed** — only backgrounds/text.
+
+---
+
 ## State & Persistence
 | State | Where saved |
 |-------|------------|
@@ -348,6 +430,8 @@ Saved in `user_settings.exit_modes` as JSONB:
 | Confirmations | Supabase `confirmations_library` table |
 | plan / subscription | Supabase `user_settings` (updated by Stripe webhook) |
 | Monthly goals | Supabase `user_settings` (goal_monthly_pnl etc.) |
+| Pairs library | Supabase `user_settings.pairs_v2` + `pairs` |
+| Default instrument type | Supabase `user_settings.instrument_type` |
 
 ---
 
@@ -358,7 +442,7 @@ Saved in `user_settings.exit_modes` as JSONB:
 - Journal table: mobile shows only Date / Pair / Outcome / P&L / Actions
 - TradeForm: direction buttons `minHeight: 48px`, outcome buttons `minHeight: 44px`
 - TradeForm screenshots: `capture="environment"` for mobile camera
-- **Important:** `useIsMobile()` must be declared inside each component that uses it — not passed as prop
+- **Important:** `useIsMobile()` must be declared inside each component that uses it — not passed as prop or called from module-level functions
 
 ---
 
@@ -371,13 +455,22 @@ Saved in `user_settings.exit_modes` as JSONB:
 - `inCalMonth = t => t.date?.slice(0, 7) === calMonth` — standard filter used everywhere
 - **No Hebrew text in the UI** — the user writes in Hebrew but all UI strings must be English
 - Goal columns must be fetched in a **separate query** from main settings to avoid crashing on missing columns
+- New DB columns must never be mixed into existing queries until confirmed they exist in production
+- `pairs_v2` is authoritative; flat `pairs` is kept in sync for backward compat
 
 ---
 
 ## Supabase SQL Migrations Run
 ```sql
+-- Trades table
 ALTER TABLE trades ADD COLUMN IF NOT EXISTS pot_rr numeric;
 ALTER TABLE trades ADD COLUMN IF NOT EXISTS exit_time text;
+ALTER TABLE trades ADD COLUMN IF NOT EXISTS instrument_type text DEFAULT 'forex';
+ALTER TABLE trades ADD COLUMN IF NOT EXISTS shares numeric;
+ALTER TABLE trades ADD COLUMN IF NOT EXISTS contracts numeric;
+ALTER TABLE trades ADD COLUMN IF NOT EXISTS point_value numeric;
+
+-- User settings table
 ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS settings_section_order jsonb;
 ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS form_section_order jsonb;
 ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS long_color text;
@@ -393,6 +486,10 @@ ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS goal_monthly_pnl numeric;
 ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS goal_win_rate numeric;
 ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS goal_trades_count int;
 ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS goal_avg_rr numeric;
+ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS default_pair text;
+ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS pairs_v2 jsonb;
+ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS instrument_type text DEFAULT 'forex';
+
 -- handle_new_user() uses SECURITY DEFINER to bypass RLS
 ```
 
@@ -407,3 +504,5 @@ ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS goal_avg_rr numeric;
 - Journal is wrapped in `JournalErrorBoundary` — runtime crashes show error message instead of black screen
 - Streak Analysis requires ≥3 closed trades (TP/Partial TP/SL/BE) to appear
 - Monthly Goals widget requires SQL migrations + at least one goal saved in Settings
+- Trading Insights require minimum 3 trades per data point to appear
+- Instrument type fields (shares, contracts, point_value) are saved to DB but not yet used in P&L calculations — current P&L is always % based on risk_pct
