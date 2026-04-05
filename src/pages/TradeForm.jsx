@@ -467,6 +467,9 @@ export default function TradeForm() {
       if (!isEditing && data.default_risk_pct) {
         setFormData(prev => ({ ...prev, risk_pct: data.default_risk_pct.toString() }))
       }
+      if (!isEditing && !duplicateData && data.default_pair) {
+        setFormData(prev => ({ ...prev, pair: data.default_pair }))
+      }
       if (!isEditing && data.default_outcome) {
         setFormData(prev => ({ ...prev, outcome: data.default_outcome }))
       }

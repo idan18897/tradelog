@@ -112,6 +112,7 @@ export default function Settings() {
   // Default risk
   const [defaultRisk, setDefaultRisk] = useState('0.5')
   const [defaultOutcome, setDefaultOutcome] = useState('Open')
+  const [defaultPair, setDefaultPairLocal] = useState('')
 
   // Direction colors
   const [longColor, setLongColor] = useState('#4ade80')
@@ -277,6 +278,7 @@ export default function Settings() {
       setPairs(data.pairs?.length ? data.pairs : DEFAULT_PAIRS)
       setDefaultRisk(data.default_risk_pct?.toString() || '0.5')
       if (data.default_outcome) setDefaultOutcome(data.default_outcome)
+      if (data.default_pair) setDefaultPairLocal(data.default_pair)
       if (data.long_color) setLongColor(data.long_color)
       if (data.short_color) setShortColor(data.short_color)
       if (data.exit_modes?.length) setExitModes(data.exit_modes)
@@ -320,6 +322,7 @@ export default function Settings() {
       pairs,
       default_risk_pct: parseFloat(defaultRisk) || 0.5,
       default_outcome: defaultOutcome,
+      default_pair: defaultPair || null,
       account_size: parseFloat(accountSize) || 10000,
       show_dollar_values: showDollarValues,
       long_color: longColor,
@@ -502,11 +505,21 @@ export default function Settings() {
                   <select
                     value={defaultOutcome}
                     onChange={e => { setDefaultOutcome(e.target.value); setIsDirty(true) }}
-                    style={{ ...inputStyle, maxWidth: '200px' }}
+                    style={{ ...inputStyle, maxWidth: '200px', marginBottom: '20px' }}
                   >
                     {['TP', 'Partial TP', 'SL', 'BE', 'Invalid', 'Open'].map(o => (
                       <option key={o} value={o}>{o}</option>
                     ))}
+                  </select>
+                  <p style={sectionTitle}>Default Pair</p>
+                  <p style={sectionSub}>Pre-selected pair in every new trade</p>
+                  <select
+                    value={defaultPair}
+                    onChange={e => { setDefaultPairLocal(e.target.value); setIsDirty(true) }}
+                    style={{ ...inputStyle, maxWidth: '200px' }}
+                  >
+                    <option value="">— None —</option>
+                    {pairs.map(p => <option key={p} value={p}>{p}</option>)}
                   </select>
                 </div>
               </SortableSection>

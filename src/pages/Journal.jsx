@@ -548,6 +548,7 @@ function JournalInner() {
   const [filterType, setFilterType] = useState('All')
   const [filterDateFrom, setFilterDateFrom] = useState('')
   const [filterDateTo, setFilterDateTo] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
   const [sortKey, setSortKey] = useState('date')
   const [sortDir, setSortDir] = useState('desc')
   const [selectedTrade, setSelectedTrade] = useState(null)
@@ -685,6 +686,15 @@ function JournalInner() {
     if (filterDirection !== 'All' && tr.direction !== filterDirection) return false
     if (filterRating > 0 && (tr.rating || 0) < filterRating) return false
     if (filterType !== 'All' && (tr.trade_type || 'live') !== filterType) return false
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase()
+      const inPair = (tr.pair || '').toLowerCase().includes(q)
+      const inNotes = (tr.notes || '').toLowerCase().includes(q)
+      const inConfs = (tr.confirmations || []).some(c => c.toLowerCase().includes(q))
+      const inOutcome = (tr.outcome || '').toLowerCase().includes(q)
+      const inDirection = (tr.direction || '').toLowerCase().includes(q)
+      if (!inPair && !inNotes && !inConfs && !inOutcome && !inDirection) return false
+    }
     return true
   })
 
@@ -1158,8 +1168,32 @@ function JournalInner() {
         </div>
       )}
 
-      {/* Filters */}
+      {/* Search + Filters */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '16px', alignItems: 'center' }}>
+        {/* Search bar */}
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+          <span style={{ position: 'absolute', left: '10px', fontSize: '14px', color: 'var(--text-muted)', pointerEvents: 'none' }}>🔍</span>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Search pair, outcome, notes..."
+            style={{
+              paddingLeft: '32px', paddingRight: searchQuery ? '30px' : '12px',
+              paddingTop: '7px', paddingBottom: '7px',
+              fontSize: '13px', borderRadius: '10px',
+              border: '1px solid var(--border)',
+              background: 'var(--input-bg)', color: 'var(--text)',
+              outline: 'none', minWidth: '220px',
+            }}
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              style={{ position: 'absolute', right: '8px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '14px', padding: '0', lineHeight: 1, display: 'flex' }}
+            >✕</button>
+          )}
+        </div>
         {/* Day filter indicator */}
         {filterDay && (
           <div style={{
@@ -1273,7 +1307,7 @@ function JournalInner() {
           <div style={{ ...cardStyle, overflow: 'hidden', marginBottom: '16px' }}>
             {filtered.length === 0 ? (
               <p style={{ fontSize: '13px', textAlign: 'center', padding: '48px 0', color: 'var(--text-muted)' }}>
-                {t.noResults}
+                {searchQuery.trim() ? `No trades found for "${searchQuery.trim()}"` : t.noResults}
               </p>
             ) : (
               <div style={{ overflowX: 'auto' }}>

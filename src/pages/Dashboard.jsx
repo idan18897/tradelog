@@ -56,7 +56,8 @@ export default function Dashboard() {
   const [trades, setTrades] = useState([])
   const [loading, setLoading] = useState(true)
   const [visible, setVisible] = useState(false)
-  const [dateFilter, setDateFilter] = useState({ type: 'all', from: '', to: '' })
+  const [dateFilter, setDateFilter] = useState({ type: 'month', from: '', to: '' })
+  const [navOffset, setNavOffset] = useState(0)
   const [showMissed, setShowMissed] = useState(false)
   const [customOpen, setCustomOpen] = useState(false)
   const [hourView, setHourView] = useState('winRate') // 'winRate' | 'volume'
@@ -114,7 +115,8 @@ export default function Dashboard() {
     if (!tr.date) return true
     const { type, from, to } = dateFilter
     if (type === 'all') return true
-    if (type === 'year') return tr.date.startsWith(String(new Date().getFullYear()))
+    if (type === 'month') return tr.date.startsWith(navMonthStr)
+    if (type === 'year') return tr.date.startsWith(navYearLabel)
     if (type === 'custom') {
       if (from && tr.date < from) return false
       if (to && tr.date > to) return false
@@ -126,8 +128,15 @@ export default function Dashboard() {
   const allLiveTrades = trades.filter(t => (t.trade_type || 'live') === 'live')
   const allMissedTrades = trades.filter(t => t.trade_type === 'missed')
 
-  // Current month goal tracking — always uses allLiveTrades regardless of date filter
+  // Navigation computed values (for Monthly / Yearly modes)
   const now = new Date()
+  const navMonthDate = new Date(now.getFullYear(), now.getMonth() + navOffset, 1)
+  const navMonthStr = `${navMonthDate.getFullYear()}-${String(navMonthDate.getMonth() + 1).padStart(2, '0')}`
+  const navMonthLabel = navMonthDate.toLocaleString('en-US', { month: 'long', year: 'numeric' })
+  const navYearNum = now.getFullYear() + navOffset
+  const navYearLabel = String(navYearNum)
+
+  // Current month goal tracking — always uses allLiveTrades regardless of date filter
   const curMonthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   const goalMonthTrades = allLiveTrades.filter(t => t.date?.startsWith(curMonthPrefix))
   const goalMonthClosed = goalMonthTrades.filter(t => ['TP', 'Partial TP', 'SL', 'BE'].includes(t.outcome))
@@ -198,10 +207,9 @@ export default function Dashboard() {
     ? ((tpTrades.length / closedTrades.length) * 100).toFixed(1)
     : null
 
-  const monthTrades = liveTrades.filter(t => {
-    const d = new Date(t.date)
-    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
-  })
+  const monthTrades = dateFilter.type === 'month'
+    ? liveTrades
+    : liveTrades.filter(t => t.date?.startsWith(curMonthPrefix))
   const monthlyPnL = monthTrades.reduce((sum, tr) => sum + computePnL(tr), 0)
 
   const avgRR = tpTrades.length > 0
@@ -996,7 +1004,7 @@ export default function Dashboard() {
       value: monthTrades.length > 0
         ? `${monthlyPnL >= 0 ? '+' : ''}${monthlyPnL.toFixed(2)}%${dollarStr(monthlyPnL)}`
         : '--',
-      sub: `${monthTrades.length} trades this month`,
+      sub: `${monthTrades.length} trades${dateFilter.type === 'month' ? ` in ${navMonthLabel}` : ' this month'}`,
       color: monthlyPnL >= 0 ? '#4ade80' : '#f87171',
     },
     {
@@ -1228,11 +1236,12 @@ export default function Dashboard() {
         {/* Filter buttons */}
         {[
           { key: 'all', label: 'All Time' },
-          { key: 'year', label: 'This Year' },
+          { key: 'month', label: 'Monthly' },
+          { key: 'year', label: 'Yearly' },
         ].map(btn => (
           <button
             key={btn.key}
-            onClick={() => { setDateFilter({ type: btn.key, from: '', to: '' }); setCustomOpen(false) }}
+            onClick={() => { setDateFilter({ type: btn.key, from: '', to: '' }); setNavOffset(0); setCustomOpen(false) }}
             style={{
               padding: '6px 14px', borderRadius: '20px', fontSize: '13px', fontWeight: 600,
               cursor: 'pointer', transition: 'all 0.15s',
@@ -1366,6 +1375,39 @@ export default function Dashboard() {
           Export PDF
         </button>
       </div>
+
+      {/* Month / Year navigation row */}
+      {(dateFilter.type === 'month' || dateFilter.type === 'year') && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginBottom: '20px' }}>
+          <button
+            onClick={() => setNavOffset(o => o - 1)}
+            style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '10px', padding: '6px 14px', fontSize: '16px', cursor: 'pointer', color: 'var(--text-muted)', transition: 'all 0.15s', fontWeight: 700 }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--accent)' }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-muted)' }}
+          >←</button>
+          <button
+            onClick={() => setNavOffset(0)}
+            title={navOffset !== 0 ? 'Back to current' : undefined}
+            style={{
+              background: navOffset === 0 ? 'var(--card-hover)' : 'var(--accent-light)',
+              border: `1px solid ${navOffset === 0 ? 'var(--border)' : 'var(--accent)'}`,
+              borderRadius: '10px', padding: '6px 20px',
+              fontSize: '14px', fontWeight: 700, cursor: navOffset !== 0 ? 'pointer' : 'default',
+              color: navOffset === 0 ? 'var(--text)' : 'var(--accent)',
+              transition: 'all 0.15s', letterSpacing: '-0.02em',
+            }}
+          >
+            {dateFilter.type === 'month' ? navMonthLabel : navYearLabel}
+            {navOffset !== 0 && <span style={{ fontSize: '11px', marginLeft: '6px', opacity: 0.7 }}>↩ now</span>}
+          </button>
+          <button
+            onClick={() => setNavOffset(o => o + 1)}
+            style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '10px', padding: '6px 14px', fontSize: '16px', cursor: 'pointer', color: 'var(--text-muted)', transition: 'all 0.15s', fontWeight: 700 }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--accent)' }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-muted)' }}
+          >→</button>
+        </div>
+      )}
 
       {/* Tab bar */}
       <div style={{ display: 'flex', gap: '0', borderBottom: '1px solid var(--border)', marginBottom: '24px' }}>
