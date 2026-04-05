@@ -65,12 +65,12 @@
 ───────────────────────────────────────── */
 [data-theme="dark"] {
   /* Backgrounds */
-  --bg:               #000000;
-  --bg-secondary:     #111111;
+  --bg:               #111113;
+  --bg-secondary:     #242428;
 
   /* Cards */
-  --card:             #1C1C1E;
-  --card-hover:       #2C2C2E;
+  --card:             #1E1E22;
+  --card-hover:       #2A2A2E;
 
   /* Borders */
   --border:           rgba(255,255,255,0.08);
@@ -103,11 +103,11 @@
   --logo-invert:      1;
 
   /* Navigation */
-  --sidebar-bg:       #111111;
+  --sidebar-bg:       #161618;
   --sidebar-border:   rgba(255,255,255,0.06);
 
   /* Inputs */
-  --input-bg:         #1C1C1E;
+  --input-bg:         #1E1E22;
   --input-border:     rgba(255,255,255,0.10);
   --input-focus:      #0A84FF;
 
