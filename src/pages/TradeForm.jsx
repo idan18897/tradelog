@@ -13,6 +13,16 @@ import { CSS } from '@dnd-kit/utilities'
 
 const DEFAULT_PAIRS = ['XAUUSD', 'EURUSD', 'GBPUSD', 'USDJPY', 'GBPJPY', 'USDCHF', 'AUDUSD', 'NAS100', 'US30', 'USOIL']
 
+const DEFAULT_PAIRS_V2 = [
+  { category: 'Forex', symbols: ['EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD'] },
+  { category: 'Metals', symbols: ['XAUUSD', 'XAGUSD'] },
+  { category: 'Indices', symbols: ['US500', 'NQ100', 'DOW30', 'UK100', 'GER40'] },
+  { category: 'Commodities', symbols: ['USOIL', 'NATGAS', 'COPPER'] },
+  { category: 'Crypto', symbols: ['BTCUSD', 'ETHUSD', 'SOLUSD'] },
+  { category: 'Stocks', symbols: ['AAPL', 'TSLA', 'NVDA', 'MSFT', 'AMZN'] },
+  { category: 'ETFs', symbols: ['SPY', 'QQQ', 'GLD', 'TLT'] },
+]
+
 // Pip size per pair (1 pip = X price units)
 const PIP_SIZES = {
   XAUUSD: 0.1,
@@ -332,12 +342,20 @@ export default function TradeForm() {
     exit_levels: [],
     exit_mode_name: '',
     pot_rr: '',
+    shares: '',
+    contracts: '',
+    point_value: '',
   })
   const [exitModes, setExitModes] = useState([
     { name: 'Standard', be_at: 3, levels: [{ pct: 50, rr: 3 }] }
   ])
   const [confirmationsList, setConfirmationsList] = useState([])
   const [pairsList, setPairsList] = useState(DEFAULT_PAIRS)
+  const [pairsV2, setPairsV2] = useState(DEFAULT_PAIRS_V2)
+  const [instrumentType, setInstrumentType] = useState('forex')
+  const [pairSearch, setPairSearch] = useState('')
+  const [showPairDrop, setShowPairDrop] = useState(false)
+  const pairDropRef = useRef(null)
 
   // HTF screenshot
   const [htfFile, setHtfFile] = useState(null)
@@ -411,6 +429,9 @@ export default function TradeForm() {
       if (loadDropdownRef.current && !loadDropdownRef.current.contains(e.target)) {
         setShowLoadDropdown(false)
       }
+      if (pairDropRef.current && !pairDropRef.current.contains(e.target)) {
+        setShowPairDrop(false)
+      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
@@ -455,13 +476,17 @@ export default function TradeForm() {
     const { data } = await supabase
       .from('user_settings').select('*').eq('user_id', user.id).maybeSingle()
     if (data) {
-      if (data.pairs?.length) {
+      if (data.pairs_v2?.length) {
+        setPairsV2(data.pairs_v2)
+        const flat = data.pairs_v2.flatMap(c => c.symbols)
+        setPairsList(flat)
+        if (!isEditing && !duplicateData) {
+          setFormData(prev => ({ ...prev, pair: flat.includes(prev.pair) ? prev.pair : flat[0] || prev.pair }))
+        }
+      } else if (data.pairs?.length) {
         setPairsList(data.pairs)
-        if (!isEditing) {
-          setFormData(prev => ({
-            ...prev,
-            pair: data.pairs.includes(prev.pair) ? prev.pair : data.pairs[0],
-          }))
+        if (!isEditing && !duplicateData) {
+          setFormData(prev => ({ ...prev, pair: data.pairs.includes(prev.pair) ? prev.pair : data.pairs[0] }))
         }
       }
       if (!isEditing && data.default_risk_pct) {
@@ -472,6 +497,9 @@ export default function TradeForm() {
       }
       if (!isEditing && data.default_outcome) {
         setFormData(prev => ({ ...prev, outcome: data.default_outcome }))
+      }
+      if (!isEditing && !duplicateData && data.instrument_type) {
+        setInstrumentType(data.instrument_type)
       }
       if (data.exit_modes?.length) setExitModes(data.exit_modes)
       if (data.form_section_order?.length) {
@@ -523,7 +551,11 @@ export default function TradeForm() {
       exit_levels: data.exit_levels || [],
       exit_mode_name: '',
       pot_rr: data.pot_rr?.toString() || '',
+      shares: data.shares?.toString() || '',
+      contracts: data.contracts?.toString() || '',
+      point_value: data.point_value?.toString() || '',
     })
+    if (data.instrument_type) setInstrumentType(data.instrument_type)
     if (data.screenshot_url) {
       setExistingHtf(data.screenshot_url)
       setHtfPreview(data.screenshot_url)
@@ -693,6 +725,10 @@ export default function TradeForm() {
         sl_to_be: formData.sl_to_be,
         be_at: formData.sl_to_be ? formData.be_at : null,
         exit_levels: formData.sl_to_be && formData.exit_levels.length ? formData.exit_levels : null,
+        instrument_type: instrumentType,
+        shares: instrumentType === 'stocks' && formData.shares ? parseFloat(formData.shares) : null,
+        contracts: instrumentType === 'indices' && formData.contracts ? parseFloat(formData.contracts) : null,
+        point_value: instrumentType === 'indices' && formData.point_value ? parseFloat(formData.point_value) : null,
       }
 
       if (isEditing) {
@@ -895,6 +931,31 @@ export default function TradeForm() {
           ))}
         </div>
 
+        {/* Instrument type toggle */}
+        <div style={{ display: 'flex', gap: '6px' }}>
+          {[
+            { key: 'forex', label: '💱 Forex', sub: 'Metals · Crypto' },
+            { key: 'stocks', label: '📈 Stocks', sub: 'ETFs' },
+            { key: 'indices', label: '📊 Indices', sub: 'Futures' },
+          ].map(({ key, label, sub }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setInstrumentType(key)}
+              style={{
+                flex: 1, padding: '8px 10px', borderRadius: '10px', fontSize: '13px', fontWeight: 600,
+                cursor: 'pointer', transition: 'all 0.15s', textAlign: 'center',
+                border: `1px solid ${instrumentType === key ? 'var(--border-strong)' : 'var(--border)'}`,
+                background: instrumentType === key ? 'var(--card-hover)' : 'transparent',
+                color: instrumentType === key ? 'var(--text)' : 'var(--text-muted)',
+              }}
+            >
+              <div>{label}</div>
+              <div style={{ fontSize: '10px', fontWeight: 400, opacity: 0.6, marginTop: '1px' }}>{sub}</div>
+            </button>
+          ))}
+        </div>
+
         {/* Load Template dropdown */}
         {templates.length > 0 && (
           <div ref={loadDropdownRef} style={{ position: 'relative', marginBottom: '12px' }}>
@@ -983,9 +1044,74 @@ export default function TradeForm() {
                         </div>
                         <div>
                           <label style={labelStyle}>{t.pair}</label>
-                          <select value={formData.pair} onChange={e => handleField('pair', e.target.value)} style={inputStyle}>
-                            {pairsList.map(p => <option key={p} value={p}>{p}</option>)}
-                          </select>
+                          <div ref={pairDropRef} style={{ position: 'relative' }}>
+                            <button
+                              type="button"
+                              onClick={() => { setShowPairDrop(o => !o); setPairSearch('') }}
+                              style={{ ...inputStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', textAlign: 'left', boxSizing: 'border-box' }}
+                            >
+                              <span style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '14px' }}>{formData.pair}</span>
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ transform: showPairDrop ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0 }}>
+                                <polyline points="6 9 12 15 18 9" />
+                              </svg>
+                            </button>
+                            {showPairDrop && (
+                              <div style={{
+                                position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 300,
+                                background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '12px',
+                                boxShadow: '0 8px 32px rgba(0,0,0,0.3)', overflow: 'hidden', maxHeight: '300px', display: 'flex', flexDirection: 'column',
+                              }}>
+                                <div style={{ padding: '8px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+                                  <input
+                                    autoFocus
+                                    type="text"
+                                    value={pairSearch}
+                                    onChange={e => setPairSearch(e.target.value)}
+                                    placeholder="Search symbol..."
+                                    style={{ ...inputStyle, padding: '7px 10px', fontSize: '13px', boxSizing: 'border-box' }}
+                                  />
+                                </div>
+                                <div style={{ overflowY: 'auto', flex: 1 }}>
+                                  {(() => {
+                                    const q = pairSearch.toLowerCase()
+                                    const hasResults = pairsV2.some(cat => cat.symbols.some(s => s.toLowerCase().includes(q)))
+                                    if (!hasResults) return <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>No symbols found</div>
+                                    return pairsV2.map((cat, ci) => {
+                                      const filtered = cat.symbols.filter(s => s.toLowerCase().includes(q))
+                                      if (filtered.length === 0) return null
+                                      return (
+                                        <div key={ci}>
+                                          <div style={{ padding: '6px 12px 3px', fontSize: '10px', fontWeight: 700, color: 'var(--text-subtle)', textTransform: 'uppercase', letterSpacing: '0.08em', background: 'var(--bg-secondary)' }}>
+                                            {cat.category}
+                                          </div>
+                                          {filtered.map(sym => (
+                                            <button
+                                              key={sym}
+                                              type="button"
+                                              onClick={() => { handleField('pair', sym); setShowPairDrop(false); setPairSearch('') }}
+                                              style={{
+                                                width: '100%', padding: '8px 14px', textAlign: 'left',
+                                                background: formData.pair === sym ? 'var(--accent-light)' : 'none',
+                                                border: 'none', cursor: 'pointer',
+                                                fontSize: '13px', fontWeight: 600, fontFamily: 'monospace',
+                                                color: formData.pair === sym ? 'var(--accent)' : 'var(--text)',
+                                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                              }}
+                                              onMouseEnter={e => { if (formData.pair !== sym) e.currentTarget.style.background = 'var(--card-hover)' }}
+                                              onMouseLeave={e => { if (formData.pair !== sym) e.currentTarget.style.background = 'none' }}
+                                            >
+                                              {sym}
+                                              {formData.pair === sym && <span style={{ fontSize: '10px' }}>✓</span>}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      )
+                                    })
+                                  })()}
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1033,10 +1159,22 @@ export default function TradeForm() {
                           )
                         })()}
                         <div>
-                          <label style={labelStyle}>{t.slPips}{formData.sl_pips && parseFloat(formData.entry) && parseFloat(formData.sl) && <span style={{ fontSize: '10px', color: 'var(--accent)', marginRight: '6px', fontWeight: 400 }}>⚡ auto</span>}</label>
-                          <input type="number" step="any" value={formData.sl_pips} onChange={e => handleField('sl_pips', e.target.value)} style={{ ...inputStyle, borderColor: formData.sl_pips ? 'var(--accent)' : 'var(--input-border)' }} placeholder="Auto" />
+                          <label style={labelStyle}>
+                            {instrumentType === 'stocks' ? 'SL ($)' : instrumentType === 'indices' ? 'SL Points' : t.slPips}
+                            {formData.sl_pips && parseFloat(formData.entry) && parseFloat(formData.sl) && instrumentType === 'forex' && <span style={{ fontSize: '10px', color: 'var(--accent)', marginLeft: '6px', fontWeight: 400 }}>⚡ auto</span>}
+                          </label>
+                          <input type="number" step="any" value={formData.sl_pips} onChange={e => handleField('sl_pips', e.target.value)} style={{ ...inputStyle, borderColor: formData.sl_pips ? 'var(--accent)' : 'var(--input-border)' }} placeholder={instrumentType === 'forex' ? 'Auto' : '0'} />
                         </div>
                         <div><label style={labelStyle}>{t.risk}</label><input type="number" step="any" value={formData.risk_pct} onChange={e => handleField('risk_pct', e.target.value)} style={inputStyle} placeholder="0.5" /></div>
+                        {instrumentType === 'stocks' && (
+                          <div><label style={labelStyle}>Shares</label><input type="number" step="1" min="1" value={formData.shares} onChange={e => handleField('shares', e.target.value)} style={inputStyle} placeholder="100" /></div>
+                        )}
+                        {instrumentType === 'indices' && (
+                          <>
+                            <div><label style={labelStyle}>Contracts</label><input type="number" step="1" min="1" value={formData.contracts} onChange={e => handleField('contracts', e.target.value)} style={inputStyle} placeholder="1" /></div>
+                            <div><label style={labelStyle}>Point Value ($)</label><input type="number" step="any" min="0" value={formData.point_value} onChange={e => handleField('point_value', e.target.value)} style={inputStyle} placeholder="20" /></div>
+                          </>
+                        )}
                       </div>
                     </div>
                   )}

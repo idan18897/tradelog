@@ -13,6 +13,16 @@ import { useUserSettings } from '../context/UserSettingsContext'
 
 const DEFAULT_PAIRS = ['XAUUSD', 'EURUSD', 'GBPUSD', 'USDJPY', 'GBPJPY', 'USDCHF', 'AUDUSD', 'NAS100', 'US30', 'USOIL']
 
+const DEFAULT_PAIRS_V2 = [
+  { category: 'Forex', symbols: ['EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD'] },
+  { category: 'Metals', symbols: ['XAUUSD', 'XAGUSD'] },
+  { category: 'Indices', symbols: ['US500', 'NQ100', 'DOW30', 'UK100', 'GER40'] },
+  { category: 'Commodities', symbols: ['USOIL', 'NATGAS', 'COPPER'] },
+  { category: 'Crypto', symbols: ['BTCUSD', 'ETHUSD', 'SOLUSD'] },
+  { category: 'Stocks', symbols: ['AAPL', 'TSLA', 'NVDA', 'MSFT', 'AMZN'] },
+  { category: 'ETFs', symbols: ['SPY', 'QQQ', 'GLD', 'TLT'] },
+]
+
 function DragHandle() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ color: 'var(--text-subtle)' }}>
@@ -104,15 +114,17 @@ export default function Settings() {
   const [newLabel, setNewLabel] = useState('')
   const [addError, setAddError] = useState('')
 
-  // Pairs state
-  const [pairs, setPairs] = useState([])
-  const [newPair, setNewPair] = useState('')
-  const [pairError, setPairError] = useState('')
+  // Pairs v2 state (categorized)
+  const [pairsV2, setPairsV2] = useState(DEFAULT_PAIRS_V2)
+  const [newSymbolInputs, setNewSymbolInputs] = useState({})
+  const [newCatName, setNewCatName] = useState('')
+  const [newCatError, setNewCatError] = useState('')
 
   // Default risk
   const [defaultRisk, setDefaultRisk] = useState('0.5')
   const [defaultOutcome, setDefaultOutcome] = useState('Open')
   const [defaultPair, setDefaultPairLocal] = useState('')
+  const [defaultInstrumentType, setDefaultInstrumentType] = useState('forex')
 
   // Direction colors
   const [longColor, setLongColor] = useState('#4ade80')
@@ -275,10 +287,11 @@ export default function Settings() {
       console.error('user_settings fetch error:', error.message)
     }
     if (data) {
-      setPairs(data.pairs?.length ? data.pairs : DEFAULT_PAIRS)
+      if (data.pairs_v2?.length) setPairsV2(data.pairs_v2)
       setDefaultRisk(data.default_risk_pct?.toString() || '0.5')
       if (data.default_outcome) setDefaultOutcome(data.default_outcome)
       if (data.default_pair) setDefaultPairLocal(data.default_pair)
+      if (data.instrument_type) setDefaultInstrumentType(data.instrument_type)
       if (data.long_color) setLongColor(data.long_color)
       if (data.short_color) setShortColor(data.short_color)
       if (data.exit_modes?.length) setExitModes(data.exit_modes)
@@ -297,29 +310,14 @@ export default function Settings() {
     }
   }
 
-  function handleAddPair() {
-    const symbol = newPair.trim().toUpperCase()
-    if (!symbol) return
-    setPairError('')
-    if (pairs.find(p => p.toUpperCase() === symbol)) {
-      setPairError(t.duplicateConfirmation); return
-    }
-    setPairs(prev => [...prev, symbol])
-    setNewPair('')
-    setIsDirty(true)
-  }
-
-  function handleDeletePair(symbol) {
-    if (!window.confirm(`${t.deleteConfirm} "${symbol}"?`)) return
-    setPairs(prev => prev.filter(p => p !== symbol))
-    setIsDirty(true)
-  }
-
   async function handleSaveAll() {
     setSaving(true)
+    const flatPairs = pairsV2.flatMap(c => c.symbols)
     const { error } = await supabase.from('user_settings').upsert({
       user_id: user.id,
-      pairs,
+      pairs: flatPairs,
+      pairs_v2: pairsV2,
+      instrument_type: defaultInstrumentType,
       default_risk_pct: parseFloat(defaultRisk) || 0.5,
       default_outcome: defaultOutcome,
       default_pair: defaultPair || null,
@@ -471,23 +469,95 @@ export default function Settings() {
             if (key === 'pairs') return (
               <SortableSection key="pairs" id="pairs">
                 <div style={cardStyle}>
-                  <p style={sectionTitle}>{t.pairsLibrary || 'Pairs Library'}</p>
-                  <p style={sectionSub}>Pairs that appear in the new trade form</p>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '14px' }}>
-                    {pairs.map(symbol => (
-                      <div key={symbol} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '8px', padding: '5px 10px 5px 8px' }}>
-                        <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', fontFamily: 'monospace' }}>{symbol}</span>
-                        <button onClick={() => handleDeletePair(symbol)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '1px', color: 'var(--text-subtle)', display: 'flex', lineHeight: 1 }} onMouseEnter={e => e.currentTarget.style.color = '#f87171'} onMouseLeave={e => e.currentTarget.style.color = 'var(--text-subtle)'}>
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-                        </button>
+                  <p style={sectionTitle}>Pairs Library</p>
+                  <p style={sectionSub}>Organize symbols by category — shown in the trade form</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {pairsV2.map((cat, catIdx) => (
+                      <div key={catIdx} style={{ border: '1px solid var(--border)', borderRadius: '12px', padding: '14px', background: 'var(--bg)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{cat.category}</span>
+                          <button
+                            onClick={() => {
+                              if (!window.confirm(`Remove category "${cat.category}" and all its symbols?`)) return
+                              setPairsV2(prev => prev.filter((_, i) => i !== catIdx)); setIsDirty(true)
+                            }}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-subtle)', fontSize: '11px', padding: '2px 6px', borderRadius: '6px' }}
+                            onMouseEnter={e => { e.currentTarget.style.color = '#f87171'; e.currentTarget.style.background = 'rgba(248,113,113,0.08)' }}
+                            onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-subtle)'; e.currentTarget.style.background = 'none' }}
+                          >Remove</button>
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
+                          {cat.symbols.map(sym => (
+                            <div key={sym} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '7px', padding: '4px 8px 4px 10px' }}>
+                              <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text)', fontFamily: 'monospace' }}>{sym}</span>
+                              <button
+                                onClick={() => { setPairsV2(prev => prev.map((c, i) => i === catIdx ? { ...c, symbols: c.symbols.filter(s => s !== sym) } : c)); setIsDirty(true) }}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '1px', color: 'var(--text-subtle)', display: 'flex', lineHeight: 1 }}
+                                onMouseEnter={e => e.currentTarget.style.color = '#f87171'}
+                                onMouseLeave={e => e.currentTarget.style.color = 'var(--text-subtle)'}
+                              ><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg></button>
+                            </div>
+                          ))}
+                        </div>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <input
+                            type="text"
+                            value={newSymbolInputs[catIdx] || ''}
+                            onChange={e => setNewSymbolInputs(prev => ({ ...prev, [catIdx]: e.target.value.toUpperCase() }))}
+                            onKeyDown={e => {
+                              if (e.key !== 'Enter') return
+                              e.preventDefault()
+                              const sym = (newSymbolInputs[catIdx] || '').trim().toUpperCase()
+                              if (!sym || pairsV2.some(c => c.symbols.includes(sym))) return
+                              setPairsV2(prev => prev.map((c, i) => i === catIdx ? { ...c, symbols: [...c.symbols, sym] } : c))
+                              setNewSymbolInputs(prev => ({ ...prev, [catIdx]: '' })); setIsDirty(true)
+                            }}
+                            placeholder="Add symbol..."
+                            style={{ ...inputStyle, flex: 1, fontFamily: 'monospace', textTransform: 'uppercase', fontSize: '12px', padding: '7px 10px' }}
+                          />
+                          <button
+                            onClick={() => {
+                              const sym = (newSymbolInputs[catIdx] || '').trim().toUpperCase()
+                              if (!sym || pairsV2.some(c => c.symbols.includes(sym))) return
+                              setPairsV2(prev => prev.map((c, i) => i === catIdx ? { ...c, symbols: [...c.symbols, sym] } : c))
+                              setNewSymbolInputs(prev => ({ ...prev, [catIdx]: '' })); setIsDirty(true)
+                            }}
+                            style={{ ...btnPrimary, padding: '7px 14px', fontSize: '13px' }}
+                          >Add</button>
+                        </div>
                       </div>
                     ))}
+                    <div style={{ borderTop: '1px solid var(--border)', paddingTop: '14px' }}>
+                      <p style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Add Category</p>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <input
+                          type="text"
+                          value={newCatName}
+                          onChange={e => { setNewCatName(e.target.value); setNewCatError('') }}
+                          onKeyDown={e => {
+                            if (e.key !== 'Enter') return
+                            e.preventDefault()
+                            const name = newCatName.trim()
+                            if (!name) return
+                            if (pairsV2.some(c => c.category.toLowerCase() === name.toLowerCase())) { setNewCatError('Already exists'); return }
+                            setPairsV2(prev => [...prev, { category: name, symbols: [] }]); setNewCatName(''); setIsDirty(true)
+                          }}
+                          placeholder="e.g. Futures"
+                          style={{ ...inputStyle, flex: 1 }}
+                        />
+                        <button
+                          onClick={() => {
+                            const name = newCatName.trim()
+                            if (!name) return
+                            if (pairsV2.some(c => c.category.toLowerCase() === name.toLowerCase())) { setNewCatError('Already exists'); return }
+                            setPairsV2(prev => [...prev, { category: name, symbols: [] }]); setNewCatName(''); setIsDirty(true)
+                          }}
+                          style={btnPrimary}
+                        >Add Category</button>
+                      </div>
+                      {newCatError && <p style={{ fontSize: '12px', color: '#f87171', marginTop: '6px' }}>{newCatError}</p>}
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <input type="text" value={newPair} onChange={e => { setNewPair(e.target.value.toUpperCase()); setPairError('') }} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddPair())} placeholder={t.newPairPlaceholder || 'e.g. BTCUSD'} style={{ ...inputStyle, fontFamily: 'monospace', textTransform: 'uppercase' }} />
-                    <button onClick={handleAddPair} style={btnPrimary}>{t.addBtn}</button>
-                  </div>
-                  {pairError && <p style={{ fontSize: '12px', color: '#f87171', marginTop: '6px' }}>{pairError}</p>}
                 </div>
               </SortableSection>
             )
@@ -516,11 +586,40 @@ export default function Settings() {
                   <select
                     value={defaultPair}
                     onChange={e => { setDefaultPairLocal(e.target.value); setIsDirty(true) }}
-                    style={{ ...inputStyle, maxWidth: '200px' }}
+                    style={{ ...inputStyle, maxWidth: '200px', marginBottom: '20px' }}
                   >
                     <option value="">— None —</option>
-                    {pairs.map(p => <option key={p} value={p}>{p}</option>)}
+                    {pairsV2.map(cat => (
+                      <optgroup key={cat.category} label={cat.category}>
+                        {cat.symbols.map(p => <option key={p} value={p}>{p}</option>)}
+                      </optgroup>
+                    ))}
                   </select>
+                  <p style={sectionTitle}>Default Instrument Type</p>
+                  <p style={sectionSub}>Pre-selected instrument mode for new trades</p>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    {[
+                      { key: 'forex', label: '💱 Forex', sub: 'Metals · Crypto' },
+                      { key: 'stocks', label: '📈 Stocks', sub: 'ETFs' },
+                      { key: 'indices', label: '📊 Indices', sub: 'Futures' },
+                    ].map(({ key, label, sub }) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => { setDefaultInstrumentType(key); setIsDirty(true) }}
+                        style={{
+                          padding: '8px 16px', borderRadius: '10px', fontSize: '13px', fontWeight: 600,
+                          cursor: 'pointer', border: `1px solid ${defaultInstrumentType === key ? 'var(--accent)' : 'var(--border)'}`,
+                          background: defaultInstrumentType === key ? 'var(--accent-light)' : 'transparent',
+                          color: defaultInstrumentType === key ? 'var(--accent)' : 'var(--text-muted)',
+                          transition: 'all 0.15s', textAlign: 'left',
+                        }}
+                      >
+                        <div>{label}</div>
+                        <div style={{ fontSize: '10px', fontWeight: 400, opacity: 0.7, marginTop: '1px' }}>{sub}</div>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </SortableSection>
             )
