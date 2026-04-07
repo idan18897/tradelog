@@ -317,7 +317,7 @@ export default function TradeForm() {
   const { t } = useLang()
   const isMobile = useIsMobile()
   const navigate = useNavigate()
-  const { plan } = useUserSettings()
+  const { plan, continuationEnabled, continuationWindowDays } = useUserSettings()
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
 
   const [formData, setFormData] = useState({
@@ -345,6 +345,8 @@ export default function TradeForm() {
     shares: '',
     contracts: '',
     point_value: '',
+    is_continuation: false,
+    parent_trade_id: null,
   })
   const [exitModes, setExitModes] = useState([
     { name: 'Standard', be_at: 3, levels: [{ pct: 50, rr: 3 }] }
@@ -353,6 +355,7 @@ export default function TradeForm() {
   const [pairsList, setPairsList] = useState(DEFAULT_PAIRS)
   const [pairsV2, setPairsV2] = useState(DEFAULT_PAIRS_V2)
   const [instrumentType, setInstrumentType] = useState('forex')
+  const [parentTrades, setParentTrades] = useState([])
   const [pairSearch, setPairSearch] = useState('')
   const [showPairDrop, setShowPairDrop] = useState(false)
   const pairDropRef = useRef(null)
@@ -554,6 +557,8 @@ export default function TradeForm() {
       shares: data.shares?.toString() || '',
       contracts: data.contracts?.toString() || '',
       point_value: data.point_value?.toString() || '',
+      is_continuation: data.is_continuation || false,
+      parent_trade_id: data.parent_trade_id || null,
     })
     if (data.instrument_type) setInstrumentType(data.instrument_type)
     if (data.screenshot_url) {
@@ -567,6 +572,27 @@ export default function TradeForm() {
     setFetching(false)
     setTimeout(() => setVisible(true), 10)
   }
+
+  // Fetch eligible parent trades (same pair + direction, within window days)
+  useEffect(() => {
+    if (!formData.is_continuation || !continuationEnabled) { setParentTrades([]); return }
+    const windowDays = continuationWindowDays || 1
+    const dateFrom = new Date(formData.date)
+    dateFrom.setDate(dateFrom.getDate() - windowDays)
+    const fromStr = dateFrom.toISOString().split('T')[0]
+    supabase
+      .from('trades')
+      .select('id, date, time, pair, direction, outcome, rr_potential, pot_rr')
+      .eq('user_id', user.id)
+      .eq('pair', formData.pair)
+      .eq('direction', formData.direction)
+      .eq('trade_type', 'live')
+      .gte('date', fromStr)
+      .lt('date', formData.date)
+      .neq('is_continuation', true)
+      .order('date', { ascending: false })
+      .then(({ data }) => setParentTrades(data || []))
+  }, [formData.is_continuation, formData.pair, formData.direction, formData.date, continuationEnabled, continuationWindowDays])
 
   const rr = computeRR(formData.entry, formData.sl, formData.tp)
 
@@ -729,6 +755,8 @@ export default function TradeForm() {
         shares: instrumentType === 'stocks' && formData.shares ? parseFloat(formData.shares) : null,
         contracts: instrumentType === 'indices' && formData.contracts ? parseFloat(formData.contracts) : null,
         point_value: instrumentType === 'indices' && formData.point_value ? parseFloat(formData.point_value) : null,
+        is_continuation: formData.is_continuation || false,
+        parent_trade_id: formData.is_continuation && formData.parent_trade_id ? formData.parent_trade_id : null,
       }
 
       if (isEditing) {
@@ -931,6 +959,79 @@ export default function TradeForm() {
           ))}
         </div>
 
+        {/* Continuation Trade toggle — only shown if feature is enabled in Settings */}
+        {continuationEnabled && formData.trade_type === 'live' && (
+          <div style={{
+            padding: '12px 14px', borderRadius: '12px',
+            border: `1px solid ${formData.is_continuation ? 'rgba(129,140,248,0.4)' : 'var(--border)'}`,
+            background: formData.is_continuation ? 'rgba(129,140,248,0.08)' : 'transparent',
+            transition: 'all 0.15s',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: formData.is_continuation ? '12px' : '0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = !formData.is_continuation
+                    handleField('is_continuation', next)
+                    if (!next) handleField('parent_trade_id', null)
+                  }}
+                  style={{
+                    width: '40px', height: '22px', borderRadius: '11px', border: 'none', cursor: 'pointer',
+                    background: formData.is_continuation ? '#818cf8' : 'var(--border-strong)',
+                    position: 'relative', transition: 'background 0.2s', flexShrink: 0,
+                  }}
+                >
+                  <span style={{
+                    position: 'absolute', top: '3px',
+                    left: formData.is_continuation ? '21px' : '3px',
+                    width: '16px', height: '16px', borderRadius: '50%',
+                    background: '#fff', transition: 'left 0.2s',
+                  }} />
+                </button>
+                <div>
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: formData.is_continuation ? '#818cf8' : 'var(--text-muted)' }}>
+                    Continuation Trade
+                  </span>
+                  <span style={{ fontSize: '11px', color: 'var(--text-subtle)', marginLeft: '8px' }}>
+                    follows an existing {formData.direction} setup on {formData.pair}
+                  </span>
+                </div>
+              </div>
+              {formData.is_continuation && (
+                <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '20px', background: 'rgba(129,140,248,0.15)', color: '#818cf8', letterSpacing: '0.04em' }}>
+                  CONT
+                </span>
+              )}
+            </div>
+
+            {/* Parent trade dropdown */}
+            {formData.is_continuation && (
+              <div>
+                <label style={{ ...labelStyle, color: '#818cf8', marginBottom: '6px', display: 'block' }}>Original Trade</label>
+                {parentTrades.length === 0 ? (
+                  <p style={{ fontSize: '12px', color: 'var(--text-muted)', padding: '8px 0' }}>
+                    No matching {formData.direction} trades on {formData.pair} in the last {continuationWindowDays} day{continuationWindowDays !== 1 ? 's' : ''}
+                  </p>
+                ) : (
+                  <select
+                    value={formData.parent_trade_id || ''}
+                    onChange={e => handleField('parent_trade_id', e.target.value || null)}
+                    style={{ ...inputStyle, borderColor: formData.parent_trade_id ? '#818cf8' : 'var(--input-border)' }}
+                  >
+                    <option value="">— Select original trade —</option>
+                    {parentTrades.map(pt => (
+                      <option key={pt.id} value={pt.id}>
+                        {pt.date} · {pt.pair} {pt.direction} · {pt.outcome || 'Open'}{pt.rr_potential || pt.pot_rr ? ` · 1:${pt.pot_rr || pt.rr_potential}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Instrument type toggle */}
         <div style={{ display: 'flex', gap: '6px' }}>
           {[
@@ -1121,7 +1222,7 @@ export default function TradeForm() {
                       <h2 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', marginBottom: '16px' }}>{t.direction}</h2>
                       <div style={{ display: 'flex', gap: '10px' }}>
                         {['Long', 'Short'].map(dir => (
-                          <button key={dir} type="button" onClick={() => handleField('direction', dir)} style={{ flex: 1, padding: '10px', minHeight: '48px', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s', background: formData.direction === dir ? dir === 'Long' ? 'var(--long-color-bg)' : 'var(--short-color-bg)' : 'var(--bg)', border: `1px solid ${formData.direction === dir ? dir === 'Long' ? 'var(--long-color)' : 'var(--short-color)' : 'var(--border)'}`, color: formData.direction === dir ? dir === 'Long' ? 'var(--long-color)' : 'var(--short-color)' : 'var(--text-muted)' }}>
+                          <button key={dir} type="button" onClick={() => handleField('direction', dir)} style={{ flex: 1, padding: '10px', minHeight: '48px', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s', background: formData.direction === dir ? dir === 'Long' ? 'var(--long-color-bg)' : 'var(--short-color-bg)' : 'var(--bg)', border: `2px solid ${formData.direction === dir ? dir === 'Long' ? 'var(--long-color)' : 'var(--short-color)' : 'var(--border)'}`, color: formData.direction === dir ? 'var(--text)' : 'var(--text-muted)' }}>
                             {dir}
                           </button>
                         ))}

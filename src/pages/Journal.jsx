@@ -163,7 +163,7 @@ function Lightbox({ src, label, onClose }) {
   return (
     <div
       style={{ position: 'fixed', inset: 0, zIndex: 2000, background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-      onClick={onClose}
+      onClick={e => { e.stopPropagation(); onClose() }}
     >
       {/* Wrapper — sized to image, toolbar glued on top */}
       <div
@@ -185,7 +185,7 @@ function Lightbox({ src, label, onClose }) {
             <button style={btnStyle} onClick={() => changeZoom(-0.5)}>−</button>
             <div style={{ width: '1px', height: '14px', background: 'rgba(255,255,255,0.15)' }} />
             <button style={{ ...btnStyle, color: 'rgba(255,255,255,0.45)', fontSize: '12px' }} onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }}>Reset</button>
-            <button style={{ ...btnStyle, background: 'rgba(255,69,58,0.2)', borderColor: 'rgba(255,69,58,0.35)', color: '#FF453A' }} onClick={onClose}>✕ Close</button>
+            <button style={{ ...btnStyle, background: 'rgba(255,69,58,0.2)', borderColor: 'rgba(255,69,58,0.35)', color: '#FF453A' }} onClick={e => { e.stopPropagation(); onClose() }}>✕ Close</button>
           </div>
         </div>
 
@@ -600,6 +600,17 @@ function JournalInner() {
     // Rollback on error
     if (error) fetchTrades()
   }
+
+  // Continuation trade lookup maps
+  const tradeById = {}
+  trades.forEach(t => { tradeById[t.id] = t })
+  const continuationsByParentId = {}
+  trades.forEach(t => {
+    if (t.is_continuation && t.parent_trade_id) {
+      if (!continuationsByParentId[t.parent_trade_id]) continuationsByParentId[t.parent_trade_id] = []
+      continuationsByParentId[t.parent_trade_id].push(t)
+    }
+  })
 
   // All live trades (existing behavior)
   const liveTrades = trades.filter(t => (t.trade_type || 'live') === 'live')
@@ -1406,7 +1417,17 @@ function JournalInner() {
                             </td>
                           )}
 
-                          <td style={{ padding: '10px 12px', fontSize: '13px', fontWeight: 500, color: 'var(--text)' }}>{trade.pair}</td>
+                          <td style={{ padding: '10px 12px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingLeft: trade.is_continuation ? '10px' : '0', borderLeft: trade.is_continuation ? '2px solid #818cf8' : 'none' }}>
+                              <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text)' }}>{trade.pair}</span>
+                              {trade.is_continuation && (
+                                <span style={{ fontSize: '9px', fontWeight: 700, padding: '1px 5px', borderRadius: '4px', background: 'rgba(129,140,248,0.15)', color: '#818cf8', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>→ CONT</span>
+                              )}
+                              {continuationsByParentId[trade.id]?.length > 0 && (
+                                <span style={{ fontSize: '9px', fontWeight: 700, padding: '1px 5px', borderRadius: '4px', background: 'rgba(129,140,248,0.08)', color: '#818cf8', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>↓ cont.</span>
+                              )}
+                            </div>
+                          </td>
                           <td style={{ padding: '10px 12px' }}>
                             <span style={{
                               fontSize: '11px', padding: '3px 8px', borderRadius: '5px', fontWeight: 500,
@@ -1512,7 +1533,6 @@ function JournalInner() {
           const tr = selectedTrade
           const badge = getOutcomeBadge(tr.outcome)
           const pnl = computePnL(tr)
-          const rr = tr.pot_rr || tr.rr_potential
           const ht = holdingTime(tr)
           const dollarPart = showDollarValues && accountSize
             ? ` ($${pnl >= 0 ? '+' : ''}${((pnl / 100) * accountSize).toFixed(0)})`
@@ -1530,6 +1550,7 @@ function JournalInner() {
                 maxHeight: 'calc(100vh - 120px)',
                 position: 'sticky', top: '80px',
                 overflow: 'hidden',
+                zIndex: 1000,
               }}
             >
               {/* Header */}
@@ -1544,6 +1565,9 @@ function JournalInner() {
                         color: tr.direction === 'Long' ? 'var(--long-color)' : 'var(--short-color)',
                       }}>{tr.direction}</span>
                       <span style={{ fontSize: '12px', fontWeight: 600, padding: '3px 10px', borderRadius: '20px', background: badge.bg, color: badge.color }}>{tr.outcome}</span>
+                      {tr.is_continuation && (
+                        <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '20px', background: 'rgba(129,140,248,0.15)', color: '#818cf8' }}>→ Continuation</span>
+                      )}
                       {tr.trade_type === 'missed' && (
                         <span style={{ fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '20px', background: 'rgba(255,159,10,0.15)', color: '#FF9F0A' }}>Missed</span>
                       )}
@@ -1584,25 +1608,63 @@ function JournalInner() {
               {/* Scrollable body */}
               <div style={{ flex: 1, overflowY: 'auto', padding: '16px 18px' }}>
 
-                {/* Stats grid */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
-                  {[
-                    { label: 'Entry', value: tr.entry ?? '--' },
-                    { label: 'SL', value: tr.sl ?? '--' },
-                    { label: 'TP', value: tr.tp ?? '--' },
-                    { label: 'SL Pips', value: tr.sl_pips ?? '--' },
-                    { label: 'R:R', value: rr ? `1:${rr}` : '--' },
-                    { label: 'Risk', value: tr.risk_pct ? `${tr.risk_pct}%` : '--' },
-                    ...(ht ? [{ label: 'Hold Time', value: ht }] : []),
-                  ].map(({ label, value }) => (
-                    <div key={label} style={{ background: 'var(--bg-secondary)', borderRadius: '10px', padding: '10px 12px' }}>
-                      <p style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '3px' }}>{label}</p>
-                      <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)' }}>{value}</p>
-                    </div>
-                  ))}
+                {/* ── Stats grid ── */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '14px' }}>
+                  {(() => {
+                    const items = []
+
+                    // P&L — colored, only for closed live trades
+                    if (tr.trade_type !== 'missed' && tr.outcome !== 'Open') {
+                      const pnlColor = pnl >= 0 ? '#30D158' : '#FF453A'
+                      const pnlStr = `${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}%`
+                      const pnlFull = dollarPart ? `${pnlStr} ${dollarPart}` : pnlStr
+                      items.push({ label: 'P&L', value: pnlFull, pnlColor })
+                    }
+
+                    // Pot. R:R = pot_rr (full market move potential)
+                    const potRR = tr.pot_rr || tr.rr_potential
+                    items.push({ label: 'Pot. R:R', value: potRR ? `1:${Number(potRR).toFixed(2)}` : '--' })
+                    // R:R = actual delivered for live closed trades, rr_potential for missed/open
+                    if (tr.trade_type === 'missed' || tr.outcome === 'Open') {
+                      if (tr.rr_potential) items.push({ label: 'R:R', value: `1:${Number(tr.rr_potential).toFixed(2)}` })
+                    } else {
+                      const risk = Number(tr.risk_pct) || 0.5
+                      const actualRR = pnl / risk
+                      items.push({ label: 'R:R', value: actualRR >= 0 ? `1:${actualRR.toFixed(2)}` : `${actualRR.toFixed(2)}R` })
+                    }
+
+                    items.push({ label: 'Entry', value: tr.entry ?? '--' })
+                    items.push({ label: 'SL', value: tr.sl ?? '--' })
+                    items.push({ label: 'TP', value: tr.tp ?? '--' })
+                    items.push({ label: 'SL Pips', value: tr.sl_pips ?? '--' })
+                    items.push({ label: 'Risk %', value: tr.risk_pct ? `${tr.risk_pct}%` : '--' })
+
+                    if (tr.time) items.push({ label: 'Entry Time', value: tr.time })
+                    if (tr.exit_time) items.push({ label: 'Exit Time', value: tr.exit_time })
+                    if (ht) items.push({ label: 'Hold Time', value: ht })
+                    if (tr.week_number) items.push({ label: 'Week', value: `W${tr.week_number}` })
+                    if (tr.day) items.push({ label: 'Day', value: tr.day })
+                    if (tr.instrument_type && tr.instrument_type !== 'forex') {
+                      items.push({ label: 'Instrument', value: tr.instrument_type === 'stocks' ? 'Stocks / ETFs' : 'Indices / Futures' })
+                    }
+                    if (tr.shares) items.push({ label: 'Shares', value: String(tr.shares) })
+                    if (tr.contracts) items.push({ label: 'Contracts', value: String(tr.contracts) })
+                    if (tr.point_value) items.push({ label: 'Point Value', value: `$${tr.point_value}` })
+
+                    return items.map(({ label, value, highlight, pnlColor }) => (
+                      <div key={label} style={{
+                        background: highlight ? 'var(--accent-light)' : 'var(--bg-secondary)',
+                        border: highlight ? '1px solid rgba(0,122,255,0.25)' : '1px solid transparent',
+                        borderRadius: '10px', padding: '10px 12px',
+                      }}>
+                        <p style={{ fontSize: '10px', fontWeight: 600, color: highlight ? 'var(--accent)' : 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '3px' }}>{label}</p>
+                        <p style={{ fontSize: '14px', fontWeight: 700, color: pnlColor || (highlight ? 'var(--accent)' : 'var(--text)') }}>{value}</p>
+                      </div>
+                    ))
+                  })()}
                 </div>
 
-                {/* Rating */}
+                {/* ── Rating ── */}
                 {tr.rating > 0 && (
                   <div style={{ marginBottom: '14px' }}>
                     <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Rating</p>
@@ -1610,10 +1672,10 @@ function JournalInner() {
                   </div>
                 )}
 
-                {/* SL to BE */}
+                {/* ── SL to BE ── */}
                 {tr.sl_to_be && (
                   <div style={{ marginBottom: '14px', padding: '10px 12px', borderRadius: '10px', background: 'rgba(250,204,21,0.08)', border: '1px solid rgba(250,204,21,0.2)' }}>
-                    <p style={{ fontSize: '11px', color: '#facc15', fontWeight: 600, marginBottom: '4px' }}>SL → Breakeven at 1:{tr.be_at || 3}</p>
+                    <p style={{ fontSize: '11px', color: '#facc15', fontWeight: 700, marginBottom: '4px' }}>SL → Breakeven at 1:{tr.be_at || 3}</p>
                     {(tr.exit_levels || []).length > 0 && (
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
                         {tr.exit_levels.map((lvl, i) => (
@@ -1626,7 +1688,7 @@ function JournalInner() {
                   </div>
                 )}
 
-                {/* Confirmations */}
+                {/* ── Confirmations ── */}
                 {(tr.confirmations || []).length > 0 && (
                   <div style={{ marginBottom: '14px' }}>
                     <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Confirmations</p>
@@ -1638,19 +1700,105 @@ function JournalInner() {
                   </div>
                 )}
 
-                {/* Missed reason */}
+                {/* ── Screenshots — open lightbox, panel stays open ── */}
+                {(tr.screenshot_url || tr.ltf_screenshot_url) && (
+                  <div style={{ marginBottom: '14px' }}>
+                    <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>Screenshots</p>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      {tr.screenshot_url && (
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontSize: '10px', fontWeight: 700, color: 'var(--accent)', marginBottom: '5px', letterSpacing: '0.04em' }}>HTF</p>
+                          <img
+                            src={tr.screenshot_url} alt="HTF Screenshot"
+                            onClick={() => setLightbox({ src: tr.screenshot_url, label: 'HTF Screenshot' })}
+                            style={{ width: '100%', height: '88px', objectFit: 'cover', borderRadius: '8px', border: '1px solid var(--border)', cursor: 'zoom-in', background: 'var(--bg)', display: 'block' }}
+                          />
+                        </div>
+                      )}
+                      {tr.ltf_screenshot_url && (
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontSize: '10px', fontWeight: 700, color: '#60a5fa', marginBottom: '5px', letterSpacing: '0.04em' }}>LTF</p>
+                          <img
+                            src={tr.ltf_screenshot_url} alt="LTF Screenshot"
+                            onClick={() => setLightbox({ src: tr.ltf_screenshot_url, label: 'LTF Screenshot' })}
+                            style={{ width: '100%', height: '88px', objectFit: 'cover', borderRadius: '8px', border: '1px solid var(--border)', cursor: 'zoom-in', background: 'var(--bg)', display: 'block' }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Missed reason ── */}
                 {tr.missed_reason && (
                   <div style={{ marginBottom: '14px' }}>
-                    <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '5px' }}>Why missed</p>
+                    <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '5px' }}>Why Missed</p>
                     <p style={{ fontSize: '13px', color: '#FF9F0A' }}>{tr.missed_reason}</p>
                   </div>
                 )}
 
-                {/* Notes */}
+                {/* ── Notes ── */}
                 {tr.notes && (
                   <div style={{ marginBottom: '14px' }}>
                     <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '5px' }}>Notes</p>
                     <p style={{ fontSize: '13px', color: 'var(--text)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{tr.notes}</p>
+                  </div>
+                )}
+
+                {/* ── Original trade cross-link ── */}
+                {tr.is_continuation && tr.parent_trade_id && tradeById[tr.parent_trade_id] && (() => {
+                  const orig = tradeById[tr.parent_trade_id]
+                  const origBadge = getOutcomeBadge(orig.outcome)
+                  return (
+                    <div style={{ marginBottom: '14px' }}>
+                      <p style={{ fontSize: '11px', fontWeight: 600, color: '#818cf8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Original Trade</p>
+                      <div
+                        onClick={() => setSelectedTrade(orig)}
+                        style={{ padding: '10px 12px', borderRadius: '10px', background: 'rgba(129,140,248,0.08)', border: '1px solid rgba(129,140,248,0.2)', cursor: 'pointer', transition: 'background 0.15s' }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(129,140,248,0.14)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'rgba(129,140,248,0.08)'}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text)' }}>{orig.pair}</span>
+                            <span style={{ fontSize: '11px', fontWeight: 600, padding: '2px 7px', borderRadius: '5px', background: origBadge.bg, color: origBadge.color }}>{orig.outcome}</span>
+                          </div>
+                          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{orig.date}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })()}
+
+                {/* ── Continuation trades cross-link ── */}
+                {continuationsByParentId[tr.id]?.length > 0 && (
+                  <div style={{ marginBottom: '14px' }}>
+                    <p style={{ fontSize: '11px', fontWeight: 600, color: '#818cf8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+                      Continuation{continuationsByParentId[tr.id].length > 1 ? 's' : ''} ({continuationsByParentId[tr.id].length})
+                    </p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {continuationsByParentId[tr.id].map(cont => {
+                        const contBadge = getOutcomeBadge(cont.outcome)
+                        return (
+                          <div
+                            key={cont.id}
+                            onClick={() => setSelectedTrade(cont)}
+                            style={{ padding: '10px 12px', borderRadius: '10px', background: 'rgba(129,140,248,0.08)', border: '1px solid rgba(129,140,248,0.2)', cursor: 'pointer', transition: 'background 0.15s' }}
+                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(129,140,248,0.14)'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'rgba(129,140,248,0.08)'}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span style={{ fontSize: '10px', fontWeight: 700, padding: '1px 5px', borderRadius: '4px', background: 'rgba(129,140,248,0.2)', color: '#818cf8' }}>→ CONT</span>
+                                <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text)' }}>{cont.pair}</span>
+                                <span style={{ fontSize: '11px', fontWeight: 600, padding: '2px 7px', borderRadius: '5px', background: contBadge.bg, color: contBadge.color }}>{cont.outcome}</span>
+                              </div>
+                              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{cont.date}</span>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
                   </div>
                 )}
 
@@ -1722,7 +1870,6 @@ function JournalInner() {
         const tr = fullDetailTrade
         const badge = getOutcomeBadge(tr.outcome)
         const pnl = computePnL(tr)
-        const rr = tr.pot_rr || tr.rr_potential
         const ht = holdingTime(tr)
         const dollarPart = showDollarValues && accountSize
           ? ` ($${pnl >= 0 ? '+' : ''}${((pnl / 100) * accountSize).toFixed(0)})`
@@ -1770,19 +1917,50 @@ function JournalInner() {
               <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
                 {/* Stats */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '18px' }}>
-                  {[
-                    { label: 'Entry', value: tr.entry ?? '--' },
-                    { label: 'SL', value: tr.sl ?? '--' },
-                    { label: 'TP', value: tr.tp ?? '--' },
-                    { label: 'SL Pips', value: tr.sl_pips ?? '--' },
-                    { label: 'R:R', value: rr ? `1:${rr}` : '--' },
-                    { label: 'Risk', value: tr.risk_pct ? `${tr.risk_pct}%` : '--' },
-                  ].map(({ label, value }) => (
-                    <div key={label} style={{ background: 'var(--bg-secondary)', borderRadius: '10px', padding: '10px 14px' }}>
-                      <p style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '3px' }}>{label}</p>
-                      <p style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text)' }}>{value}</p>
-                    </div>
-                  ))}
+                  {(() => {
+                    const items = []
+                    if (tr.trade_type !== 'missed' && tr.outcome !== 'Open') {
+                      const pnlColor = pnl >= 0 ? '#30D158' : '#FF453A'
+                      const pnlStr = `${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}%`
+                      const pnlFull = dollarPart ? `${pnlStr} ${dollarPart}` : pnlStr
+                      items.push({ label: 'P&L', value: pnlFull, pnlColor })
+                    }
+                    const potRR = tr.pot_rr || tr.rr_potential
+                    items.push({ label: 'Pot. R:R', value: potRR ? `1:${Number(potRR).toFixed(2)}` : '--' })
+                    if (tr.trade_type === 'missed' || tr.outcome === 'Open') {
+                      if (tr.rr_potential) items.push({ label: 'R:R', value: `1:${Number(tr.rr_potential).toFixed(2)}` })
+                    } else {
+                      const risk = Number(tr.risk_pct) || 0.5
+                      const actualRR = pnl / risk
+                      items.push({ label: 'R:R', value: actualRR >= 0 ? `1:${actualRR.toFixed(2)}` : `${actualRR.toFixed(2)}R` })
+                    }
+                    items.push({ label: 'Entry', value: tr.entry ?? '--' })
+                    items.push({ label: 'SL', value: tr.sl ?? '--' })
+                    items.push({ label: 'TP', value: tr.tp ?? '--' })
+                    items.push({ label: 'SL Pips', value: tr.sl_pips ?? '--' })
+                    items.push({ label: 'Risk %', value: tr.risk_pct ? `${tr.risk_pct}%` : '--' })
+                    if (tr.time) items.push({ label: 'Entry Time', value: tr.time })
+                    if (tr.exit_time) items.push({ label: 'Exit Time', value: tr.exit_time })
+                    if (ht) items.push({ label: 'Hold Time', value: ht })
+                    if (tr.week_number) items.push({ label: 'Week', value: `W${tr.week_number}` })
+                    if (tr.day) items.push({ label: 'Day', value: tr.day })
+                    if (tr.instrument_type && tr.instrument_type !== 'forex') {
+                      items.push({ label: 'Instrument', value: tr.instrument_type === 'stocks' ? 'Stocks / ETFs' : 'Indices / Futures' })
+                    }
+                    if (tr.shares) items.push({ label: 'Shares', value: String(tr.shares) })
+                    if (tr.contracts) items.push({ label: 'Contracts', value: String(tr.contracts) })
+                    if (tr.point_value) items.push({ label: 'Point Value', value: `${tr.point_value}` })
+                    return items.map(({ label, value, highlight, pnlColor }) => (
+                      <div key={label} style={{
+                        background: highlight ? 'var(--accent-light)' : 'var(--bg-secondary)',
+                        border: highlight ? '1px solid rgba(0,122,255,0.25)' : '1px solid transparent',
+                        borderRadius: '10px', padding: '10px 14px',
+                      }}>
+                        <p style={{ fontSize: '10px', fontWeight: 600, color: highlight ? 'var(--accent)' : 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '3px' }}>{label}</p>
+                        <p style={{ fontSize: '15px', fontWeight: 600, color: pnlColor || (highlight ? 'var(--accent)' : 'var(--text)') }}>{value}</p>
+                      </div>
+                    ))
+                  })()}
                 </div>
 
                 {/* SL to BE */}
@@ -1844,7 +2022,7 @@ function JournalInner() {
                         <div style={{ flex: 1, minWidth: '200px' }}>
                           <p style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 600, marginBottom: '6px' }}>HTF</p>
                           <img src={tr.screenshot_url} alt="HTF"
-                            onClick={() => { setFullDetailTrade(null); setLightbox({ src: tr.screenshot_url, label: 'HTF Screenshot' }) }}
+                            onClick={() => setLightbox({ src: tr.screenshot_url, label: 'HTF Screenshot' })}
                             style={{ width: '100%', maxHeight: '260px', objectFit: 'contain', borderRadius: '10px', border: '1px solid var(--border)', cursor: 'zoom-in', background: 'var(--bg)' }}
                           />
                         </div>
@@ -1853,7 +2031,7 @@ function JournalInner() {
                         <div style={{ flex: 1, minWidth: '200px' }}>
                           <p style={{ fontSize: '11px', color: '#60a5fa', fontWeight: 600, marginBottom: '6px' }}>LTF</p>
                           <img src={tr.ltf_screenshot_url} alt="LTF"
-                            onClick={() => { setFullDetailTrade(null); setLightbox({ src: tr.ltf_screenshot_url, label: 'LTF Screenshot' }) }}
+                            onClick={() => setLightbox({ src: tr.ltf_screenshot_url, label: 'LTF Screenshot' })}
                             style={{ width: '100%', maxHeight: '260px', objectFit: 'contain', borderRadius: '10px', border: '1px solid var(--border)', cursor: 'zoom-in', background: 'var(--bg)' }}
                           />
                         </div>

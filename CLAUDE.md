@@ -142,6 +142,8 @@ supabase/
 | shares | numeric | Number of shares (stocks mode) |
 | contracts | numeric | Number of contracts (indices mode) |
 | point_value | numeric | Dollar value per point (indices mode) |
+| is_continuation | boolean | True if this trade continues a prior setup |
+| parent_trade_id | uuid | FK → trades(id) ON DELETE SET NULL |
 
 ### `user_settings` table
 | Column | Type | Notes |
@@ -172,6 +174,8 @@ supabase/
 | goal_win_rate | numeric | Monthly win rate target (%) |
 | goal_trades_count | int | Monthly trades count target |
 | goal_avg_rr | numeric | Monthly average R:R target |
+| continuation_enabled | boolean | Enable Continuation Trades feature (default: false) |
+| continuation_window_days | int | Look-back window in days for parent trade search (default: 1) |
 
 ### `confirmations_library` table
 | Column | Type | Notes |
@@ -438,6 +442,7 @@ Accent colors (blue, green, red) are **never changed** — only backgrounds/text
 | Monthly goals | Supabase `user_settings` (goal_monthly_pnl etc.) |
 | Pairs library | Supabase `user_settings.pairs_v2` + `pairs` |
 | Default instrument type | Supabase `user_settings.instrument_type` |
+| Continuation settings | Supabase `user_settings.continuation_enabled` + `continuation_window_days` |
 
 ---
 
@@ -453,8 +458,9 @@ Accent colors (blue, green, red) are **never changed** — only backgrounds/text
 ---
 
 ## Important Conventions
-- **Never use `rr_potential` for display** — always show `pot_rr || rr_potential`
-- **Always use `rr_potential` for calculations** — derived from actual prices
+- **`pot_rr` and `rr_potential` are the same concept** — both represent potential/theoretical R:R. Display either as "Pot. R:R" using `pot_rr || rr_potential`
+- **"R:R" (actual)** = what the trade actually delivered = `computePnL(tr) / (tr.risk_pct || 0.5)`. Only shown for closed live trades (not missed, not Open)
+- **Always use `rr_potential` for calculations** — derived from actual prices (entry/SL/TP)
 - `risk_pct` defaults to `0.5` when missing
 - All P&L values are in **% of account** (not absolute $)
 - `calMonth` format: `"YYYY-MM"` string
@@ -497,6 +503,12 @@ ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS pairs_v2 jsonb;
 ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS instrument_type text DEFAULT 'forex';
 
 -- handle_new_user() uses SECURITY DEFINER to bypass RLS
+
+-- Continuation trades columns
+ALTER TABLE trades ADD COLUMN IF NOT EXISTS is_continuation boolean DEFAULT false;
+ALTER TABLE trades ADD COLUMN IF NOT EXISTS parent_trade_id uuid REFERENCES trades(id) ON DELETE SET NULL;
+ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS continuation_enabled boolean DEFAULT false;
+ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS continuation_window_days int DEFAULT 1;
 ```
 
 ---
@@ -538,6 +550,15 @@ ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS instrument_type text DEFAULT 
 - Daily Trade Reminder (browser notification)
 - Trade Templates management
 - Cancel Subscription / Upgrade Plan
+
+### Continuation Trades
+- Toggle in Settings → Trading → "Continuation Trades" (enable/disable feature + window days 1–14)
+- Trade Form: "Continuation Trade" toggle shown only when feature enabled + trade type = live
+  - When enabled, shows parent trade dropdown: same pair + direction, within window days, not a continuation itself
+  - Saved as `trades.is_continuation` (boolean) and `trades.parent_trade_id` (uuid FK)
+- Journal table: continuation rows have left purple border + "→ CONT" badge; original rows show "↓ cont." badge
+- Journal detail panel: "→ Continuation" badge in header; "Original Trade" card (clickable → selects that trade); "Continuations" list of linked trades
+- Dashboard Insights: compares continuation win rate vs original setup win rate (shown if ≥3 of each)
 
 ### Infrastructure
 - Stripe payments (Monthly $14.99 / Yearly $99 / Lifetime $199)
