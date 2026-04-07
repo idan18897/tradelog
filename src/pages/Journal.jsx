@@ -1642,8 +1642,6 @@ function JournalInner() {
                     if (tr.time) items.push({ label: 'Entry Time', value: tr.time })
                     if (tr.exit_time) items.push({ label: 'Exit Time', value: tr.exit_time })
                     if (ht) items.push({ label: 'Hold Time', value: ht })
-                    if (tr.week_number) items.push({ label: 'Week', value: `W${tr.week_number}` })
-                    if (tr.day) items.push({ label: 'Day', value: tr.day })
                     if (tr.instrument_type && tr.instrument_type !== 'forex') {
                       items.push({ label: 'Instrument', value: tr.instrument_type === 'stocks' ? 'Stocks / ETFs' : 'Indices / Futures' })
                     }
@@ -1700,34 +1698,6 @@ function JournalInner() {
                   </div>
                 )}
 
-                {/* ── Screenshots — open lightbox, panel stays open ── */}
-                {(tr.screenshot_url || tr.ltf_screenshot_url) && (
-                  <div style={{ marginBottom: '14px' }}>
-                    <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>Screenshots</p>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      {tr.screenshot_url && (
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <p style={{ fontSize: '10px', fontWeight: 700, color: 'var(--accent)', marginBottom: '5px', letterSpacing: '0.04em' }}>HTF</p>
-                          <img
-                            src={tr.screenshot_url} alt="HTF Screenshot"
-                            onClick={() => setLightbox({ src: tr.screenshot_url, label: 'HTF Screenshot' })}
-                            style={{ width: '100%', height: '88px', objectFit: 'cover', borderRadius: '8px', border: '1px solid var(--border)', cursor: 'zoom-in', background: 'var(--bg)', display: 'block' }}
-                          />
-                        </div>
-                      )}
-                      {tr.ltf_screenshot_url && (
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <p style={{ fontSize: '10px', fontWeight: 700, color: '#60a5fa', marginBottom: '5px', letterSpacing: '0.04em' }}>LTF</p>
-                          <img
-                            src={tr.ltf_screenshot_url} alt="LTF Screenshot"
-                            onClick={() => setLightbox({ src: tr.ltf_screenshot_url, label: 'LTF Screenshot' })}
-                            style={{ width: '100%', height: '88px', objectFit: 'cover', borderRadius: '8px', border: '1px solid var(--border)', cursor: 'zoom-in', background: 'var(--bg)', display: 'block' }}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
 
                 {/* ── Missed reason ── */}
                 {tr.missed_reason && (
@@ -1876,7 +1846,7 @@ function JournalInner() {
           : ''
         return (
           <div
-            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}
             onClick={() => setFullDetailTrade(null)}
           >
             <div
