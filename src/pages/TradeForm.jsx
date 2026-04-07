@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { useLang } from '../context/LanguageContext'
 import { useIsMobile } from '../hooks/useIsMobile'
 import { useUserSettings } from '../context/UserSettingsContext'
+import { useTheme } from '../context/ThemeContext'
 import DatePicker from '../components/DatePicker'
 import UpgradeModal from '../components/UpgradeModal'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
@@ -317,7 +318,17 @@ export default function TradeForm() {
   const { t } = useLang()
   const isMobile = useIsMobile()
   const navigate = useNavigate()
-  const { plan, continuationEnabled, continuationWindowDays } = useUserSettings()
+  const { plan, continuationEnabled, continuationWindowDays, longColor, shortColor } = useUserSettings()
+  const { theme } = useTheme()
+  // Ensure direction colors are visible in light mode (darken if too light)
+  function visibleColor(hex) {
+    if (theme === 'dark' || !hex?.startsWith('#') || hex.length < 7) return hex
+    const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16)
+    const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+    return lum > 0.6 ? `rgb(${Math.round(r * 0.45)},${Math.round(g * 0.45)},${Math.round(b * 0.45)})` : hex
+  }
+  const longVis = visibleColor(longColor)
+  const shortVis = visibleColor(shortColor)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
 
   const [formData, setFormData] = useState({
@@ -1222,7 +1233,7 @@ export default function TradeForm() {
                       <h2 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', marginBottom: '16px' }}>{t.direction}</h2>
                       <div style={{ display: 'flex', gap: '10px' }}>
                         {['Long', 'Short'].map(dir => (
-                          <button key={dir} type="button" onClick={() => handleField('direction', dir)} style={{ flex: 1, padding: '10px', minHeight: '48px', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s', background: formData.direction === dir ? dir === 'Long' ? 'var(--long-color-bg)' : 'var(--short-color-bg)' : 'var(--bg)', border: `2px solid ${formData.direction === dir ? dir === 'Long' ? 'var(--long-color)' : 'var(--short-color)' : 'var(--border)'}`, color: formData.direction === dir ? 'var(--text)' : 'var(--text-muted)' }}>
+                          <button key={dir} type="button" onClick={() => handleField('direction', dir)} style={{ flex: 1, padding: '10px', minHeight: '48px', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s', background: formData.direction === dir ? `${dir === 'Long' ? longVis : shortVis}22` : 'var(--bg)', border: `2px solid ${formData.direction === dir ? (dir === 'Long' ? longVis : shortVis) : 'var(--border)'}`, color: formData.direction === dir ? (dir === 'Long' ? longVis : shortVis) : 'var(--text-muted)' }}>
                             {dir}
                           </button>
                         ))}
