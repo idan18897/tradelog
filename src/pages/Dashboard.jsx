@@ -405,15 +405,21 @@ export default function Dashboard() {
 
   // Entry Heatmap (hour × day of week) — live + missed, filtered by date
   const ENTRY_DAY_KEYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-  const entryHeatmapLive = {}
-  const entryHeatmapMissed = {}
-  ENTRY_DAY_KEYS.forEach(d => { entryHeatmapLive[d] = {}; entryHeatmapMissed[d] = {} })
+  // entryGrid[day][hour] = { total, wins, losses }
+  const entryGrid = {}
+  ENTRY_DAY_KEYS.forEach(d => { entryGrid[d] = {} })
   allLiveTrades.filter(inDateRange).forEach(tr => {
     if (!tr.time || !tr.date) return
     const hour = parseInt(tr.time.split(':')[0], 10)
     const dayKey = ENTRY_DAY_KEYS[new Date(tr.date + 'T00:00:00').getDay()]
-    entryHeatmapLive[dayKey][hour] = (entryHeatmapLive[dayKey][hour] || 0) + 1
+    if (!entryGrid[dayKey][hour]) entryGrid[dayKey][hour] = { total: 0, wins: 0, losses: 0 }
+    entryGrid[dayKey][hour].total++
+    if (tr.outcome === 'TP' || tr.outcome === 'Partial TP') entryGrid[dayKey][hour].wins++
+    else if (tr.outcome === 'SL') entryGrid[dayKey][hour].losses++
   })
+  // keep missed separate for count only
+  const entryHeatmapMissed = {}
+  ENTRY_DAY_KEYS.forEach(d => { entryHeatmapMissed[d] = {} })
   allMissedTrades.filter(inDateRange).forEach(tr => {
     if (!tr.time || !tr.date) return
     const hour = parseInt(tr.time.split(':')[0], 10)
@@ -422,16 +428,16 @@ export default function Dashboard() {
   })
   const entryHoursSet = new Set()
   ENTRY_DAY_KEYS.forEach(d => {
-    Object.keys(entryHeatmapLive[d]).forEach(h => entryHoursSet.add(parseInt(h)))
+    Object.keys(entryGrid[d]).forEach(h => entryHoursSet.add(parseInt(h)))
     Object.keys(entryHeatmapMissed[d]).forEach(h => entryHoursSet.add(parseInt(h)))
   })
   const entryHours = Array.from(entryHoursSet).sort((a, b) => a - b)
-  const entryHeatmapMax = Math.max(1, ...ENTRY_DAY_KEYS.flatMap(d => Object.keys(entryHeatmapLive[d]).map(h => (entryHeatmapLive[d][h] || 0) + (entryHeatmapMissed[d][h] || 0))))
+  const entryHeatmapMax = Math.max(1, ...ENTRY_DAY_KEYS.flatMap(d => Object.keys(entryGrid[d]).map(h => (entryGrid[d][h]?.total || 0) + (entryHeatmapMissed[d][h] || 0))))
   const entryPeakHour = (() => {
     const totals = {}
     ENTRY_DAY_KEYS.forEach(d => {
-      const allH = new Set([...Object.keys(entryHeatmapLive[d]), ...Object.keys(entryHeatmapMissed[d])])
-      allH.forEach(h => { totals[h] = (totals[h] || 0) + (entryHeatmapLive[d][h] || 0) + (entryHeatmapMissed[d][h] || 0) })
+      const allH = new Set([...Object.keys(entryGrid[d]), ...Object.keys(entryHeatmapMissed[d])])
+      allH.forEach(h => { totals[h] = (totals[h] || 0) + (entryGrid[d][h]?.total || 0) + (entryHeatmapMissed[d][h] || 0) })
     })
     const best = Object.entries(totals).sort((a, b) => b[1] - a[1])[0]
     return best ? { hour: parseInt(best[0]), count: best[1] } : null
@@ -439,7 +445,7 @@ export default function Dashboard() {
   const entryPeakDay = (() => {
     const totals = ENTRY_DAY_KEYS.map(d => ({
       day: d,
-      count: Object.values(entryHeatmapLive[d]).reduce((s, v) => s + v, 0) + Object.values(entryHeatmapMissed[d]).reduce((s, v) => s + v, 0)
+      count: Object.values(entryGrid[d]).reduce((s, v) => s + (v.total || 0), 0) + Object.values(entryHeatmapMissed[d]).reduce((s, v) => s + v, 0)
     }))
     return totals.sort((a, b) => b.count - a.count)[0]
   })()
@@ -2112,34 +2118,33 @@ export default function Dashboard() {
                 <div key={day} style={{ display: 'grid', gridTemplateColumns: `52px repeat(${entryHours.length}, 1fr)`, gap: '3px', marginBottom: '3px' }}>
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '8px' }}>{day}</div>
                   {entryHours.map(h => {
-                    const live = entryHeatmapLive[day][h] || 0
+                    const cell = entryGrid[day][h] || { total: 0, wins: 0, losses: 0 }
                     const missed = entryHeatmapMissed[day][h] || 0
+                    const live = cell.total
                     const total = live + missed
-                    const pct = total / entryHeatmapMax
                     const isEmpty = total === 0
+                    const closed = cell.wins + cell.losses
+                    const winRate = closed > 0 ? cell.wins / closed : null
+                    // Color by win rate: green=win, red=loss, blue=no closed trades
+                    const cellBg = isEmpty ? 'var(--bg-secondary)'
+                      : winRate === null ? (missed > 0 ? '#f59e0b66' : '#1d4ed866')
+                      : winRate >= 0.6 ? '#16a34a'
+                      : winRate >= 0.4 ? '#ca8a04'
+                      : '#dc2626'
+                    const textCol = isEmpty ? 'transparent' : '#fff'
+                    const tooltipWR = closed > 0 ? ` · ${Math.round(winRate*100)}% WR (${cell.wins}W/${cell.losses}L)` : ''
                     return (
-                      <div key={h} title={`${day} ${String(h).padStart(2, '0')}:00 — ${live} live · ${missed} missed`} style={{
-                        height: '28px', borderRadius: '4px', overflow: 'hidden',
-                        background: isEmpty ? 'var(--bg-secondary)' : 'transparent',
+                      <div key={h} title={`${day} ${String(h).padStart(2, '0')}:00 — ${live} live${missed > 0 ? ` · ${missed} missed` : ''}${tooltipWR}`} style={{
+                        height: '28px', borderRadius: '4px',
+                        background: cellBg,
                         display: 'flex', flexDirection: 'column',
+                        alignItems: 'center', justifyContent: 'center',
+                        position: 'relative',
                       }}>
                         {!isEmpty && (
                           <>
-                            {live > 0 && (
-                              <div style={{
-                                flex: live, background: pct < 0.33 ? '#1d4ed833' : pct < 0.66 ? '#1d4ed866' : '#1d4ed8',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                fontSize: '10px', fontWeight: 600, color: pct >= 0.66 ? '#fff' : '#93c5fd',
-                                minHeight: missed > 0 ? '50%' : '100%',
-                              }}>{live}</div>
-                            )}
-                            {missed > 0 && (
-                              <div style={{
-                                flex: missed, background: pct < 0.33 ? '#f59e0b33' : pct < 0.66 ? '#f59e0b66' : '#f59e0b',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                fontSize: '10px', fontWeight: 600, color: pct >= 0.66 ? '#fff' : '#fcd34d',
-                                minHeight: live > 0 ? '50%' : '100%',
-                              }}>{missed}</div>
+                            <span style={{ fontSize: '10px', fontWeight: 700, color: textCol, lineHeight: 1 }}>{total}</span>
+                            {closed > 0 && <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.8)', lineHeight: 1 }}>{Math.round(winRate*100)}%</span>}
                             )}
                           </>
                         )}
@@ -2149,12 +2154,13 @@ export default function Dashboard() {
                 </div>
               ))}
               {/* Legend */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '8px', justifyContent: 'flex-end' }}>
-                <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>fewer</span>
-                {['33', '66', 'ff'].map(op => (
-                  <div key={op} style={{ width: '12px', height: '12px', borderRadius: '3px', background: `#1d4ed8${op}` }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px', flexWrap: 'wrap' }}>
+                {[['#16a34a','≥60% wins'],['#ca8a04','40–60%'],['#dc2626','<40% wins'],['#1d4ed866','No closed'],['#f59e0b','● Missed']].map(([color, label]) => (
+                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: color }} />
+                    <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{label}</span>
+                  </div>
                 ))}
-                <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginLeft: '4px' }}>more</span>
               </div>
             </div>
           </div>
