@@ -397,29 +397,44 @@ export default function Dashboard() {
       pnl: parseFloat(h.trades.reduce((s, tr) => s + computePnL(tr), 0).toFixed(2)),
     }))
 
-  // Entry Heatmap (hour × day of week) — uses all-time live trades (not filtered by date)
+  // Entry Heatmap (hour × day of week) — live + missed, filtered by date
   const ENTRY_DAY_KEYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-  const entryHeatmap = {}
-  ENTRY_DAY_KEYS.forEach(d => { entryHeatmap[d] = {} })
-  liveTrades.forEach(tr => {
+  const entryHeatmapLive = {}
+  const entryHeatmapMissed = {}
+  ENTRY_DAY_KEYS.forEach(d => { entryHeatmapLive[d] = {}; entryHeatmapMissed[d] = {} })
+  allLiveTrades.filter(inDateRange).forEach(tr => {
     if (!tr.time || !tr.date) return
     const hour = parseInt(tr.time.split(':')[0], 10)
-    const dayIdx = new Date(tr.date + 'T00:00:00').getDay()
-    const dayKey = ENTRY_DAY_KEYS[dayIdx]
-    entryHeatmap[dayKey][hour] = (entryHeatmap[dayKey][hour] || 0) + 1
+    const dayKey = ENTRY_DAY_KEYS[new Date(tr.date + 'T00:00:00').getDay()]
+    entryHeatmapLive[dayKey][hour] = (entryHeatmapLive[dayKey][hour] || 0) + 1
+  })
+  allMissedTrades.filter(inDateRange).forEach(tr => {
+    if (!tr.time || !tr.date) return
+    const hour = parseInt(tr.time.split(':')[0], 10)
+    const dayKey = ENTRY_DAY_KEYS[new Date(tr.date + 'T00:00:00').getDay()]
+    entryHeatmapMissed[dayKey][hour] = (entryHeatmapMissed[dayKey][hour] || 0) + 1
   })
   const entryHoursSet = new Set()
-  ENTRY_DAY_KEYS.forEach(d => Object.keys(entryHeatmap[d]).forEach(h => entryHoursSet.add(parseInt(h))))
+  ENTRY_DAY_KEYS.forEach(d => {
+    Object.keys(entryHeatmapLive[d]).forEach(h => entryHoursSet.add(parseInt(h)))
+    Object.keys(entryHeatmapMissed[d]).forEach(h => entryHoursSet.add(parseInt(h)))
+  })
   const entryHours = Array.from(entryHoursSet).sort((a, b) => a - b)
-  const entryHeatmapMax = Math.max(1, ...ENTRY_DAY_KEYS.flatMap(d => Object.values(entryHeatmap[d])))
+  const entryHeatmapMax = Math.max(1, ...ENTRY_DAY_KEYS.flatMap(d => Object.keys(entryHeatmapLive[d]).map(h => (entryHeatmapLive[d][h] || 0) + (entryHeatmapMissed[d][h] || 0))))
   const entryPeakHour = (() => {
     const totals = {}
-    ENTRY_DAY_KEYS.forEach(d => Object.entries(entryHeatmap[d]).forEach(([h, v]) => { totals[h] = (totals[h] || 0) + v }))
+    ENTRY_DAY_KEYS.forEach(d => {
+      const allH = new Set([...Object.keys(entryHeatmapLive[d]), ...Object.keys(entryHeatmapMissed[d])])
+      allH.forEach(h => { totals[h] = (totals[h] || 0) + (entryHeatmapLive[d][h] || 0) + (entryHeatmapMissed[d][h] || 0) })
+    })
     const best = Object.entries(totals).sort((a, b) => b[1] - a[1])[0]
     return best ? { hour: parseInt(best[0]), count: best[1] } : null
   })()
   const entryPeakDay = (() => {
-    const totals = ENTRY_DAY_KEYS.map(d => ({ day: d, count: Object.values(entryHeatmap[d]).reduce((s, v) => s + v, 0) }))
+    const totals = ENTRY_DAY_KEYS.map(d => ({
+      day: d,
+      count: Object.values(entryHeatmapLive[d]).reduce((s, v) => s + v, 0) + Object.values(entryHeatmapMissed[d]).reduce((s, v) => s + v, 0)
+    }))
     return totals.sort((a, b) => b.count - a.count)[0]
   })()
 
@@ -2013,11 +2028,23 @@ export default function Dashboard() {
       </div>
 
       {/* Entry Heatmap */}
-      {liveTrades.length > 0 && (
+      {(allLiveTrades.filter(inDateRange).length > 0 || allMissedTrades.filter(inDateRange).length > 0) && entryHours.length > 0 && (
         <div style={{ ...cardStyle, padding: '20px', marginBottom: '20px' }}>
-          <div style={{ marginBottom: '16px' }}>
-            <h2 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', marginBottom: '4px' }}>Entry time heatmap</h2>
-            <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>When do you enter trades? Darker = more trades</p>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
+            <div>
+              <h2 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', marginBottom: '4px' }}>Entry time heatmap</h2>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>When do you enter trades? Darker = more</p>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <div style={{ width: '10px', height: '10px', borderRadius: '2px', background: '#1d4ed8' }} />
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Live</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <div style={{ width: '10px', height: '10px', borderRadius: '2px', background: '#f59e0b' }} />
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Missed</span>
+              </div>
+            </div>
           </div>
 
           {/* Summary cards */}
@@ -2057,22 +2084,37 @@ export default function Dashboard() {
                 <div key={day} style={{ display: 'grid', gridTemplateColumns: `52px repeat(${entryHours.length}, 1fr)`, gap: '3px', marginBottom: '3px' }}>
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '8px' }}>{day}</div>
                   {entryHours.map(h => {
-                    const val = entryHeatmap[day][h] || 0
-                    const pct = val / entryHeatmapMax
-                    const bg = val === 0 ? 'var(--bg-secondary)'
-                      : pct < 0.25 ? '#1d4ed8' + '33'
-                      : pct < 0.5 ? '#1d4ed8' + '66'
-                      : pct < 0.75 ? '#1d4ed8' + 'aa'
-                      : '#1d4ed8'
-                    const textColor = pct >= 0.5 ? '#fff' : 'var(--text-muted)'
+                    const live = entryHeatmapLive[day][h] || 0
+                    const missed = entryHeatmapMissed[day][h] || 0
+                    const total = live + missed
+                    const pct = total / entryHeatmapMax
+                    const isEmpty = total === 0
                     return (
-                      <div key={h} title={`${day} ${String(h).padStart(2, '0')}:00 — ${val} trade${val !== 1 ? 's' : ''}`} style={{
-                        height: '28px', borderRadius: '4px', background: bg,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: '10px', fontWeight: 600, color: val > 0 ? textColor : 'transparent',
-                        cursor: val > 0 ? 'default' : 'default',
+                      <div key={h} title={`${day} ${String(h).padStart(2, '0')}:00 — ${live} live · ${missed} missed`} style={{
+                        height: '28px', borderRadius: '4px', overflow: 'hidden',
+                        background: isEmpty ? 'var(--bg-secondary)' : 'transparent',
+                        display: 'flex', flexDirection: 'column',
                       }}>
-                        {val > 0 ? val : ''}
+                        {!isEmpty && (
+                          <>
+                            {live > 0 && (
+                              <div style={{
+                                flex: live, background: pct < 0.33 ? '#1d4ed833' : pct < 0.66 ? '#1d4ed866' : '#1d4ed8',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: '10px', fontWeight: 600, color: pct >= 0.66 ? '#fff' : '#93c5fd',
+                                minHeight: missed > 0 ? '50%' : '100%',
+                              }}>{live}</div>
+                            )}
+                            {missed > 0 && (
+                              <div style={{
+                                flex: missed, background: pct < 0.33 ? '#f59e0b33' : pct < 0.66 ? '#f59e0b66' : '#f59e0b',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: '10px', fontWeight: 600, color: pct >= 0.66 ? '#fff' : '#fcd34d',
+                                minHeight: live > 0 ? '50%' : '100%',
+                              }}>{missed}</div>
+                            )}
+                          </>
+                        )}
                       </div>
                     )
                   })}
@@ -2081,10 +2123,10 @@ export default function Dashboard() {
               {/* Legend */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '8px', justifyContent: 'flex-end' }}>
                 <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>fewer</span>
-                {['33', '66', 'aa', 'ff'].map(op => (
+                {['33', '66', 'ff'].map(op => (
                   <div key={op} style={{ width: '12px', height: '12px', borderRadius: '3px', background: `#1d4ed8${op}` }} />
                 ))}
-                <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>more</span>
+                <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginLeft: '4px' }}>more</span>
               </div>
             </div>
           </div>
