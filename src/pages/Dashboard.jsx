@@ -77,6 +77,11 @@ export default function Dashboard() {
   const [goalToast, setGoalToast] = useState(null)
   const [confettiPieces, setConfettiPieces] = useState([])
   const achievedGoalsRef = useRef(new Set())
+  const [claudeOpen, setClaudeOpen] = useState(false)
+  const [claudeQuestion, setClaudeQuestion] = useState('')
+  const [claudeLoading, setClaudeLoading] = useState(false)
+  const [claudeHistory, setClaudeHistory] = useState([])
+  const claudeBottomRef = useRef(null)
   const customRef = useRef(null)
 
   useEffect(() => {
@@ -1168,6 +1173,28 @@ export default function Dashboard() {
         </Link>
       </div>
     )
+  }
+
+  const askClaude = async () => {
+    if (!claudeQuestion.trim() || claudeLoading) return
+    const q = claudeQuestion.trim()
+    setClaudeQuestion('')
+    setClaudeLoading(true)
+    setClaudeHistory(h => [...h, { role: 'user', text: q }])
+    try {
+      const res = await fetch('/api/ask-claude', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: q, trades }),
+      })
+      const data = await res.json()
+      setClaudeHistory(h => [...h, { role: 'claude', text: data.answer || data.error || 'Error' }])
+    } catch {
+      setClaudeHistory(h => [...h, { role: 'claude', text: 'Connection error' }])
+    } finally {
+      setClaudeLoading(false)
+      setTimeout(() => claudeBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
+    }
   }
 
   return (
