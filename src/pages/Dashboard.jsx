@@ -2145,7 +2145,7 @@ export default function Dashboard() {
                           <>
                             <span style={{ fontSize: '10px', fontWeight: 700, color: textCol, lineHeight: 1 }}>{total}</span>
                             {closed > 0 && <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.8)', lineHeight: 1 }}>{Math.round(winRate*100)}%</span>}
-                            )}
+                            {missed > 0 && <div style={{ position: 'absolute', top: 2, right: 3, width: '5px', height: '5px', borderRadius: '50%', background: '#f59e0b' }} />}
                           </>
                         )}
                       </div>
