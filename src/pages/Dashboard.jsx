@@ -2993,10 +2993,10 @@ export default function Dashboard() {
       )}
 
       {/* Claude Chat Widget */}
-      <div style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 1000 }}>
+      <div style={{ position: 'fixed', bottom: '24px', left: '24px', zIndex: 1000 }}>
         {claudeOpen && (
           <div style={{
-            position: 'absolute', bottom: '64px', right: 0,
+            position: 'absolute', bottom: '64px', left: 0,
             width: '340px', maxHeight: '480px',
             background: 'var(--card)', border: '1px solid var(--border)',
             borderRadius: '16px', boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
