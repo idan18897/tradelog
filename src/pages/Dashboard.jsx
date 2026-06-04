@@ -2020,10 +2020,11 @@ export default function Dashboard() {
                 {thisWeekBounds.from.slice(5).replace('-', '/')} – {thisWeekBounds.to.slice(5).replace('-', '/')}
               </p>
             </div>
-            <span style={{
-              fontSize: '11px', fontWeight: 600, padding: '4px 10px', borderRadius: '20px',
-              background: 'var(--bg-secondary)', color: 'var(--text-muted)',
-            }}>This week</span>
+            <Link to="/review" style={{
+              fontSize: '12px', fontWeight: 600, padding: '6px 14px', borderRadius: '20px',
+              background: 'var(--accent-light)', color: 'var(--accent)',
+              textDecoration: 'none', whiteSpace: 'nowrap',
+            }}>Review week →</Link>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'auto 1fr', gap: '20px', alignItems: 'start' }}>
             {/* Score circle */}
