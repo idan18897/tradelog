@@ -401,7 +401,7 @@ export default function Dashboard() {
   const ENTRY_DAY_KEYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
   const entryHeatmap = {}
   ENTRY_DAY_KEYS.forEach(d => { entryHeatmap[d] = {} })
-  allLiveTrades.forEach(tr => {
+  liveTrades.forEach(tr => {
     if (!tr.time || !tr.date) return
     const hour = parseInt(tr.time.split(':')[0], 10)
     const dayIdx = new Date(tr.date + 'T00:00:00').getDay()
@@ -2013,7 +2013,7 @@ export default function Dashboard() {
       </div>
 
       {/* Entry Heatmap */}
-      {allLiveTrades.length > 0 && (
+      {liveTrades.length > 0 && (
         <div style={{ ...cardStyle, padding: '20px', marginBottom: '20px' }}>
           <div style={{ marginBottom: '16px' }}>
             <h2 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', marginBottom: '4px' }}>Entry time heatmap</h2>
