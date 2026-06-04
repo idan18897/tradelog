@@ -2992,6 +2992,89 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* Claude Chat Widget */}
+      <div style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 1000 }}>
+        {claudeOpen && (
+          <div style={{
+            position: 'absolute', bottom: '64px', right: 0,
+            width: '340px', maxHeight: '480px',
+            background: 'var(--card)', border: '1px solid var(--border)',
+            borderRadius: '16px', boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+            display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          }}>
+            <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', margin: 0 }}>Ask about your trades</p>
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: 0 }}>Powered by Claude AI</p>
+              </div>
+              <button onClick={() => setClaudeOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '20px', lineHeight: 1 }}>×</button>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '10px', minHeight: '200px' }}>
+              {claudeHistory.length === 0 && (
+                <div style={{ padding: '8px 0' }}>
+                  <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '10px' }}>Try asking:</p>
+                  {['What is my win rate?', 'Which pair is most profitable?', 'What is my best trading day?'].map(s => (
+                    <button key={s} onClick={() => setClaudeQuestion(s)} style={{
+                      display: 'block', width: '100%', textAlign: 'left', marginBottom: '6px',
+                      background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+                      borderRadius: '8px', padding: '7px 10px', fontSize: '11px',
+                      color: 'var(--text-muted)', cursor: 'pointer',
+                    }}>{s}</button>
+                  ))}
+                </div>
+              )}
+              {claudeHistory.map((msg, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                  <div style={{
+                    maxWidth: '85%', padding: '8px 11px',
+                    borderRadius: msg.role === 'user' ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
+                    background: msg.role === 'user' ? '#0A84FF' : 'var(--bg-secondary)',
+                    fontSize: '12px', lineHeight: 1.5,
+                    color: msg.role === 'user' ? '#fff' : 'var(--text)',
+                    whiteSpace: 'pre-wrap',
+                  }}>{msg.text}</div>
+                </div>
+              ))}
+              {claudeLoading && (
+                <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                  <div style={{ background: 'var(--bg-secondary)', borderRadius: '12px 12px 12px 2px', padding: '8px 14px', fontSize: '18px', color: 'var(--text-muted)' }}>···</div>
+                </div>
+              )}
+              <div ref={claudeBottomRef} />
+            </div>
+            <div style={{ padding: '10px 12px', borderTop: '1px solid var(--border)', display: 'flex', gap: '8px' }}>
+              <input
+                value={claudeQuestion}
+                onChange={e => setClaudeQuestion(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && askClaude()}
+                placeholder="Ask a question..."
+                style={{
+                  flex: 1, background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+                  borderRadius: '8px', padding: '8px 10px', fontSize: '12px',
+                  color: 'var(--text)', outline: 'none',
+                }}
+              />
+              <button onClick={askClaude} disabled={claudeLoading || !claudeQuestion.trim()} style={{
+                background: '#0A84FF', border: 'none', borderRadius: '8px',
+                padding: '8px 14px', cursor: 'pointer', fontSize: '16px', color: '#fff',
+                opacity: claudeLoading || !claudeQuestion.trim() ? 0.5 : 1,
+              }}>↑</button>
+            </div>
+          </div>
+        )}
+        <button onClick={() => setClaudeOpen(o => !o)} style={{
+          width: '52px', height: '52px', borderRadius: '50%',
+          background: claudeOpen ? 'var(--card)' : '#0A84FF',
+          border: claudeOpen ? '1px solid var(--border)' : 'none',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
+          cursor: 'pointer', fontSize: '22px',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: claudeOpen ? 'var(--text-muted)' : '#fff',
+          transition: 'all 0.2s',
+        }}>
+          {claudeOpen ? '×' : '✦'}
+        </button>
+      </div>
       </> }
     </div>
     </>
