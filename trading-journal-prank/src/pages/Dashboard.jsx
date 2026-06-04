@@ -397,32 +397,6 @@ export default function Dashboard() {
       pnl: parseFloat(h.trades.reduce((s, tr) => s + computePnL(tr), 0).toFixed(2)),
     }))
 
-  // Entry Heatmap (hour × day of week)
-  const DAY_KEYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-  const heatmapData = {}
-  DAY_KEYS.forEach(d => { heatmapData[d] = {} })
-  liveTrades.forEach(tr => {
-    if (!tr.time || !tr.date) return
-    const hour = parseInt(tr.time.split(':')[0], 10)
-    const dayIdx = new Date(tr.date + 'T00:00:00').getDay()
-    const dayKey = DAY_KEYS[dayIdx]
-    heatmapData[dayKey][hour] = (heatmapData[dayKey][hour] || 0) + 1
-  })
-  const heatmapHours = Array.from({ length: 18 }, (_, i) => i + 6).filter(h =>
-    DAY_KEYS.some(d => heatmapData[d][h])
-  )
-  const heatmapMax = Math.max(1, ...DAY_KEYS.flatMap(d => Object.values(heatmapData[d])))
-  const heatmapPeakHour = (() => {
-    const totals = {}
-    DAY_KEYS.forEach(d => Object.entries(heatmapData[d]).forEach(([h, v]) => { totals[h] = (totals[h] || 0) + v }))
-    const best = Object.entries(totals).sort((a, b) => b[1] - a[1])[0]
-    return best ? { hour: parseInt(best[0]), count: best[1] } : null
-  })()
-  const heatmapPeakDay = (() => {
-    const totals = DAY_KEYS.map(d => ({ day: d, count: Object.values(heatmapData[d]).reduce((s, v) => s + v, 0) }))
-    return totals.sort((a, b) => b.count - a.count)[0]
-  })()
-
   // Average Holding Time
   function parseTimeToMinutes(t) {
     if (!t) return null
@@ -2011,85 +1985,6 @@ export default function Dashboard() {
           </ResponsiveContainer>
         )}
       </div>
-
-      {/* Entry Heatmap */}
-      {liveTrades.some(tr => tr.time && tr.date) && heatmapHours.length > 0 && (
-        <div style={{ ...cardStyle, padding: '20px', marginBottom: '20px' }}>
-          <div style={{ marginBottom: '16px' }}>
-            <h2 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', marginBottom: '4px' }}>Entry time heatmap</h2>
-            <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>When do you enter trades? Darker = more trades</p>
-          </div>
-
-          {/* Summary cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginBottom: '18px' }}>
-            {heatmapPeakHour && (
-              <div style={{ background: 'var(--bg-secondary)', borderRadius: '8px', padding: '10px 14px' }}>
-                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '3px' }}>Busiest hour</p>
-                <p style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text)' }}>
-                  {String(heatmapPeakHour.hour).padStart(2, '0')}:00
-                </p>
-                <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{heatmapPeakHour.count} trades total</p>
-              </div>
-            )}
-            {heatmapPeakDay && heatmapPeakDay.count > 0 && (
-              <div style={{ background: 'var(--bg-secondary)', borderRadius: '8px', padding: '10px 14px' }}>
-                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '3px' }}>Busiest day</p>
-                <p style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text)' }}>{heatmapPeakDay.day}</p>
-                <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{heatmapPeakDay.count} trades total</p>
-              </div>
-            )}
-          </div>
-
-          {/* Grid */}
-          <div style={{ overflowX: 'auto' }}>
-            <div style={{ minWidth: '480px' }}>
-              {/* Hour labels */}
-              <div style={{ display: 'grid', gridTemplateColumns: `52px repeat(${heatmapHours.length}, 1fr)`, gap: '3px', marginBottom: '3px' }}>
-                <div />
-                {heatmapHours.map(h => (
-                  <div key={h} style={{ fontSize: '10px', color: 'var(--text-muted)', textAlign: 'center' }}>
-                    {String(h).padStart(2, '0')}:00
-                  </div>
-                ))}
-              </div>
-              {/* Day rows — Mon→Sun order */}
-              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
-                <div key={day} style={{ display: 'grid', gridTemplateColumns: `52px repeat(${heatmapHours.length}, 1fr)`, gap: '3px', marginBottom: '3px' }}>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '8px' }}>{day}</div>
-                  {heatmapHours.map(h => {
-                    const val = heatmapData[day][h] || 0
-                    const pct = val / heatmapMax
-                    const bg = val === 0 ? 'var(--bg-secondary)'
-                      : pct < 0.25 ? '#1d4ed8' + '33'
-                      : pct < 0.5 ? '#1d4ed8' + '66'
-                      : pct < 0.75 ? '#1d4ed8' + 'aa'
-                      : '#1d4ed8'
-                    const textColor = pct >= 0.5 ? '#fff' : 'var(--text-muted)'
-                    return (
-                      <div key={h} title={`${day} ${String(h).padStart(2, '0')}:00 — ${val} trade${val !== 1 ? 's' : ''}`} style={{
-                        height: '28px', borderRadius: '4px', background: bg,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: '10px', fontWeight: 600, color: val > 0 ? textColor : 'transparent',
-                        cursor: val > 0 ? 'default' : 'default',
-                      }}>
-                        {val > 0 ? val : ''}
-                      </div>
-                    )
-                  })}
-                </div>
-              ))}
-              {/* Legend */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '8px', justifyContent: 'flex-end' }}>
-                <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>fewer</span>
-                {['33', '66', 'aa', 'ff'].map(op => (
-                  <div key={op} style={{ width: '12px', height: '12px', borderRadius: '3px', background: `#1d4ed8${op}` }} />
-                ))}
-                <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>more</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Winners & Losers */}
       {closedTrades.length > 0 && (
