@@ -358,6 +358,10 @@ export default function TradeForm() {
     point_value: '',
     is_continuation: false,
     parent_trade_id: null,
+    mood: null,
+    setup_quality: null,
+    rule_violated: false,
+    rule_violation_notes: '',
   })
   const [exitModes, setExitModes] = useState([
     { name: 'Standard', be_at: 3, levels: [{ pct: 50, rr: 3 }] }
@@ -471,6 +475,10 @@ export default function TradeForm() {
           outcome: 'Open',
           notes: duplicateData.notes || '',
           rating: duplicateData.rating || null,
+          mood: duplicateData.mood || null,
+          setup_quality: duplicateData.setup_quality || null,
+          rule_violated: duplicateData.rule_violated || false,
+          rule_violation_notes: duplicateData.rule_violation_notes || '',
           trade_type: duplicateData.trade_type || 'live',
           missed_reason: duplicateData.missed_reason || '',
           sl_to_be: duplicateData.sl_to_be || false,
@@ -558,6 +566,10 @@ export default function TradeForm() {
       outcome: data.outcome || 'Open',
       notes: data.notes || '',
       rating: data.rating || null,
+      mood: data.mood || null,
+      setup_quality: data.setup_quality || null,
+      rule_violated: data.rule_violated || false,
+      rule_violation_notes: data.rule_violation_notes || '',
       trade_type: data.trade_type || 'live',
       missed_reason: data.missed_reason || '',
       sl_to_be: data.sl_to_be || false,
@@ -768,6 +780,10 @@ export default function TradeForm() {
         point_value: instrumentType === 'indices' && formData.point_value ? parseFloat(formData.point_value) : null,
         is_continuation: formData.is_continuation || false,
         parent_trade_id: formData.is_continuation && formData.parent_trade_id ? formData.parent_trade_id : null,
+        mood: formData.mood || null,
+        setup_quality: formData.setup_quality || null,
+        rule_violated: formData.rule_violated || false,
+        rule_violation_notes: formData.rule_violated ? (formData.rule_violation_notes || '') : null,
       }
 
       if (isEditing) {
@@ -1391,11 +1407,64 @@ export default function TradeForm() {
                   )}
                   {sectionId === 'rating' && (
                     <div style={cardStyle}>
+                      {/* Trade Rating */}
                       <div style={{ marginBottom: '14px' }}>
                         <h2 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', marginBottom: '4px' }}>{t.tradeRating || 'Trade Rating'}</h2>
                         <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{t.tradeRatingHint || 'How clean was the setup? (optional)'}</p>
                       </div>
                       <StarRating value={formData.rating} onChange={val => handleField('rating', val)} size={34} />
+
+                      {/* Mood */}
+                      <div style={{ marginTop: '20px', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+                        <h2 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', marginBottom: '4px' }}>Mood before trade</h2>
+                        <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '10px' }}>How were you feeling when you entered?</p>
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                          {[
+                            { val: 1, emoji: '😴', label: 'Tired' },
+                            { val: 2, emoji: '😤', label: 'Emotional' },
+                            { val: 3, emoji: '😐', label: 'Neutral' },
+                            { val: 4, emoji: '🙂', label: 'Focused' },
+                            { val: 5, emoji: '🔥', label: 'In the zone' },
+                          ].map(m => (
+                            <button key={m.val} type="button" onClick={() => handleField('mood', formData.mood === m.val ? null : m.val)} style={{
+                              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
+                              padding: '8px 12px', borderRadius: '10px', border: '1px solid',
+                              borderColor: formData.mood === m.val ? '#0A84FF' : 'var(--border)',
+                              background: formData.mood === m.val ? 'rgba(10,132,255,0.12)' : 'var(--bg-secondary)',
+                              cursor: 'pointer', minWidth: '56px',
+                            }}>
+                              <span style={{ fontSize: '22px' }}>{m.emoji}</span>
+                              <span style={{ fontSize: '10px', color: formData.mood === m.val ? '#0A84FF' : 'var(--text-muted)', fontWeight: formData.mood === m.val ? 600 : 400 }}>{m.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Rule Violation */}
+                      <div style={{ marginTop: '20px', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                          <div>
+                            <h2 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', marginBottom: '2px' }}>Rule violation</h2>
+                            <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Did you break your trading plan?</p>
+                          </div>
+                          <button type="button" onClick={() => handleField('rule_violated', !formData.rule_violated)} style={{
+                            width: '44px', height: '24px', borderRadius: '12px', border: 'none', cursor: 'pointer',
+                            background: formData.rule_violated ? '#f87171' : 'var(--bg-secondary)',
+                            position: 'relative', transition: 'background 0.2s',
+                          }}>
+                            <div style={{
+                              width: '18px', height: '18px', borderRadius: '50%', background: '#fff',
+                              position: 'absolute', top: '3px',
+                              left: formData.rule_violated ? '23px' : '3px', transition: 'left 0.2s',
+                            }} />
+                          </button>
+                        </div>
+                        {formData.rule_violated && (
+                          <textarea value={formData.rule_violation_notes} onChange={e => handleField('rule_violation_notes', e.target.value)}
+                            placeholder="What rule did you break? (optional)" rows={2}
+                            style={{ ...inputStyle, resize: 'vertical', padding: '10px 12px', fontFamily: 'inherit', marginTop: '6px' }} />
+                        )}
+                      </div>
                     </div>
                   )}
                   {sectionId === 'notes' && (
