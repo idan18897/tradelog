@@ -608,6 +608,48 @@ export default function Dashboard() {
   const violationPnl = parseFloat(violationTrades.reduce((s, t) => s + computePnL(t), 0).toFixed(2))
   const cleanPnl = parseFloat(cleanTrades.reduce((s, t) => s + computePnL(t), 0).toFixed(2))
 
+  // ── Weekly Score ────────────────────────────────────────
+  function getISOWeekBounds(d) {
+    const day = d.getDay() || 7
+    const mon = new Date(d); mon.setDate(d.getDate() - (day - 1))
+    const sun = new Date(mon); sun.setDate(mon.getDate() + 6)
+    const fmt = dt => `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`
+    return { from: fmt(mon), to: fmt(sun) }
+  }
+  const thisWeekBounds = getISOWeekBounds(now)
+  const lastWeekDate = new Date(now); lastWeekDate.setDate(now.getDate() - 7)
+  const lastWeekBounds = getISOWeekBounds(lastWeekDate)
+
+  function calcWeekStats(bounds) {
+    const wTrades = allLiveTrades.filter(t => t.date >= bounds.from && t.date <= bounds.to)
+    const wClosed = wTrades.filter(t => ['TP','Partial TP','SL','BE'].includes(t.outcome))
+    const wTP = wClosed.filter(t => t.outcome === 'TP' || t.outcome === 'Partial TP').length
+    const wPnL = parseFloat(wTrades.reduce((s, t) => s + computePnL(t), 0).toFixed(2))
+    const wWR = wClosed.length ? Math.round(wTP / wClosed.length * 100) : null
+    const wViolations = wTrades.filter(t => t.rule_violated).length
+    const wDisciplinePct = wTrades.length > 0 ? Math.round((1 - wViolations / wTrades.length) * 100) : null
+    let score = null
+    if (wClosed.length >= 1) {
+      const wrScore = wWR !== null ? Math.min(40, Math.round(wWR / 100 * 40)) : 0
+      const pnlScore = wPnL > 0 ? Math.min(30, Math.round(wPnL * 3)) : 0
+      const discScore = wDisciplinePct !== null ? Math.round(wDisciplinePct / 100 * 30) : 30
+      score = Math.min(100, wrScore + pnlScore + discScore)
+    }
+    return { trades: wTrades.length, closed: wClosed.length, tp: wTP, pnl: wPnL, winRate: wWR, violations: wViolations, score }
+  }
+  const thisWeekStats = calcWeekStats(thisWeekBounds)
+  const lastWeekStats = calcWeekStats(lastWeekBounds)
+
+  function weekScoreGrade(s) {
+    if (s === null) return { grade: '--', label: 'No closed trades this week', color: 'var(--text-muted)' }
+    if (s >= 80) return { grade: 'A', label: 'Excellent week 🔥', color: '#30D158' }
+    if (s >= 65) return { grade: 'B', label: 'Strong week 💪', color: '#0A84FF' }
+    if (s >= 50) return { grade: 'C', label: 'Decent week', color: '#FF9F0A' }
+    if (s >= 35) return { grade: 'D', label: 'Needs improvement', color: '#FF6B6B' }
+    return { grade: 'F', label: 'Rough week — review & reset', color: '#FF453A' }
+  }
+  const weekGrade = weekScoreGrade(thisWeekStats.score)
+
   // ── Trading Insights ────────────────────────────────────────
   const insightTrades = allLiveTrades.filter(inDateRange).filter(tr => !['Open', 'Invalid'].includes(tr.outcome))
   const insightClosed = insightTrades.filter(tr => ['TP', 'Partial TP', 'SL', 'BE'].includes(tr.outcome))
@@ -1967,6 +2009,121 @@ export default function Dashboard() {
           </div>
         )
       })()}
+
+      {/* Weekly Score */}
+      {thisWeekStats.trades > 0 && (
+        <div style={{ ...cardStyle, padding: '20px', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+            <div>
+              <h2 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', marginBottom: '3px' }}>Weekly Score</h2>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                {thisWeekBounds.from.slice(5).replace('-', '/')} – {thisWeekBounds.to.slice(5).replace('-', '/')}
+              </p>
+            </div>
+            <span style={{
+              fontSize: '11px', fontWeight: 600, padding: '4px 10px', borderRadius: '20px',
+              background: 'var(--bg-secondary)', color: 'var(--text-muted)',
+            }}>This week</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'auto 1fr', gap: '20px', alignItems: 'start' }}>
+            {/* Score circle */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', minWidth: '100px' }}>
+              <div style={{
+                width: '80px', height: '80px', borderRadius: '50%',
+                background: `conic-gradient(${weekGrade.color} ${(thisWeekStats.score ?? 0) * 3.6}deg, var(--bg-secondary) 0deg)`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: `0 0 16px ${weekGrade.color}40`,
+              }}>
+                <div style={{
+                  width: '62px', height: '62px', borderRadius: '50%', background: 'var(--card)',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <span style={{ fontSize: '20px', fontWeight: 800, color: weekGrade.color, lineHeight: 1 }}>
+                    {thisWeekStats.score !== null ? thisWeekStats.score : '--'}
+                  </span>
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)', lineHeight: 1.2 }}>/100</span>
+                </div>
+              </div>
+              <span style={{ fontSize: '11px', fontWeight: 600, color: weekGrade.color, textAlign: 'center' }}>{weekGrade.label}</span>
+            </div>
+            {/* Stats grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
+              {[
+                {
+                  label: 'Trades',
+                  value: thisWeekStats.trades,
+                  prev: lastWeekStats.trades,
+                  format: v => String(v),
+                  up: thisWeekStats.trades > lastWeekStats.trades,
+                  neutral: thisWeekStats.trades === lastWeekStats.trades,
+                },
+                {
+                  label: 'Win Rate',
+                  value: thisWeekStats.winRate,
+                  prev: lastWeekStats.winRate,
+                  format: v => v !== null ? `${v}%` : '--',
+                  up: (thisWeekStats.winRate ?? 0) > (lastWeekStats.winRate ?? 0),
+                  neutral: thisWeekStats.winRate === lastWeekStats.winRate,
+                  positive: v => v !== null && v >= 50,
+                },
+                {
+                  label: 'P&L',
+                  value: thisWeekStats.pnl,
+                  prev: lastWeekStats.pnl,
+                  format: v => `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`,
+                  up: thisWeekStats.pnl > lastWeekStats.pnl,
+                  neutral: thisWeekStats.pnl === lastWeekStats.pnl,
+                  positive: v => v >= 0,
+                },
+                {
+                  label: 'Violations',
+                  value: thisWeekStats.violations,
+                  prev: lastWeekStats.violations,
+                  format: v => v === 0 ? '✅ None' : `${v} trade${v > 1 ? 's' : ''}`,
+                  up: thisWeekStats.violations < lastWeekStats.violations,
+                  neutral: thisWeekStats.violations === lastWeekStats.violations,
+                  positive: v => v === 0,
+                },
+              ].map(stat => {
+                const val = stat.value
+                const isPositive = stat.positive ? stat.positive(val) : stat.up
+                const valColor = stat.label === 'P&L'
+                  ? (val >= 0 ? '#30D158' : '#FF453A')
+                  : stat.label === 'Win Rate'
+                    ? ((val ?? 0) >= 50 ? '#30D158' : val !== null ? '#FF453A' : 'var(--text-muted)')
+                    : stat.label === 'Violations'
+                      ? (val === 0 ? '#30D158' : '#FF453A')
+                      : 'var(--text)'
+                const diff = lastWeekStats.trades > 0 && val !== null && stat.prev !== null
+                  ? (stat.label === 'Violations' || stat.label === 'Trades')
+                    ? val - stat.prev
+                    : val - stat.prev
+                  : null
+                const arrow = diff === null || diff === 0 ? null : stat.label === 'Violations' ? (diff < 0 ? '↓' : '↑') : (diff > 0 ? '↑' : '↓')
+                const arrowGood = diff === null ? false : stat.label === 'Violations' ? diff < 0 : stat.label === 'Trades' ? diff > 0 : diff > 0
+                return (
+                  <div key={stat.label} style={{ background: 'var(--bg-secondary)', borderRadius: '10px', padding: '12px 14px' }}>
+                    <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>{stat.label}</p>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                      <span style={{ fontSize: '16px', fontWeight: 700, color: valColor }}>{stat.format(val)}</span>
+                      {arrow && (
+                        <span style={{ fontSize: '11px', fontWeight: 600, color: arrowGood ? '#30D158' : '#FF453A' }}>
+                          {arrow} {Math.abs(diff ?? 0).toFixed(stat.label === 'P&L' ? 2 : 0)}{stat.label === 'P&L' ? '%' : stat.label === 'Win Rate' ? '%' : ''}
+                        </span>
+                      )}
+                    </div>
+                    {lastWeekStats.trades > 0 && (
+                      <p style={{ fontSize: '10px', color: 'var(--text-subtle)', marginTop: '2px' }}>
+                        Last week: {stat.format(stat.prev)}
+                      </p>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Equity Curve */}
       {equityData.length > 1 && (
