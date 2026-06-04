@@ -397,11 +397,11 @@ export default function Dashboard() {
       pnl: parseFloat(h.trades.reduce((s, tr) => s + computePnL(tr), 0).toFixed(2)),
     }))
 
-  // Entry Heatmap (hour × day of week)
+  // Entry Heatmap (hour × day of week) — uses all-time live trades (not filtered by date)
   const DAY_KEYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
   const heatmapData = {}
   DAY_KEYS.forEach(d => { heatmapData[d] = {} })
-  liveTrades.forEach(tr => {
+  allLiveTrades.forEach(tr => {
     if (!tr.time || !tr.date) return
     const hour = parseInt(tr.time.split(':')[0], 10)
     const dayIdx = new Date(tr.date + 'T00:00:00').getDay()
@@ -2013,7 +2013,7 @@ export default function Dashboard() {
       </div>
 
       {/* Entry Heatmap */}
-      {liveTrades.some(tr => tr.time && tr.date) && heatmapHours.length > 0 && (
+      {allLiveTrades.some(tr => tr.time && tr.date) && heatmapHours.length > 0 && (
         <div style={{ ...cardStyle, padding: '20px', marginBottom: '20px' }}>
           <div style={{ marginBottom: '16px' }}>
             <h2 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', marginBottom: '4px' }}>Entry time heatmap</h2>
