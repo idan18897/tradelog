@@ -590,6 +590,24 @@ export default function Dashboard() {
     riskOfRuin = parseFloat(Math.min(q * 100, 100).toFixed(1))
   }
 
+  // ── Mood & Discipline Analytics ────────────────────────────────────────
+  const MOOD_LABELS = { 1: { label: 'Tired', emoji: '😴' }, 2: { label: 'Emotional', emoji: '😤' }, 3: { label: 'Neutral', emoji: '😐' }, 4: { label: 'Focused', emoji: '🙂' }, 5: { label: 'In the zone', emoji: '🔥' } }
+  const moodTrades = allLiveTrades.filter(inDateRange).filter(t => t.mood && ['TP','Partial TP','SL','BE'].includes(t.outcome))
+  const moodStats = [1,2,3,4,5].map(m => {
+    const ts = moodTrades.filter(t => t.mood === m)
+    const wins = ts.filter(t => t.outcome === 'TP' || t.outcome === 'Partial TP').length
+    const pnl = ts.reduce((s, t) => s + computePnL(t), 0)
+    return { mood: m, ...MOOD_LABELS[m], total: ts.length, winRate: ts.length ? Math.round(wins / ts.length * 100) : null, pnl: parseFloat(pnl.toFixed(2)) }
+  }).filter(m => m.total > 0)
+
+  const disciplineTrades = allLiveTrades.filter(inDateRange).filter(t => ['TP','Partial TP','SL','BE'].includes(t.outcome))
+  const violationTrades = disciplineTrades.filter(t => t.rule_violated)
+  const cleanTrades = disciplineTrades.filter(t => !t.rule_violated)
+  const violationWR = violationTrades.length ? Math.round(violationTrades.filter(t => t.outcome === 'TP' || t.outcome === 'Partial TP').length / violationTrades.length * 100) : null
+  const cleanWR = cleanTrades.length ? Math.round(cleanTrades.filter(t => t.outcome === 'TP' || t.outcome === 'Partial TP').length / cleanTrades.length * 100) : null
+  const violationPnl = parseFloat(violationTrades.reduce((s, t) => s + computePnL(t), 0).toFixed(2))
+  const cleanPnl = parseFloat(cleanTrades.reduce((s, t) => s + computePnL(t), 0).toFixed(2))
+
   // ── Trading Insights ────────────────────────────────────────
   const insightTrades = allLiveTrades.filter(inDateRange).filter(tr => !['Open', 'Invalid'].includes(tr.outcome))
   const insightClosed = insightTrades.filter(tr => ['TP', 'Partial TP', 'SL', 'BE'].includes(tr.outcome))
@@ -2876,6 +2894,73 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Mood & Discipline Analytics */}
+      {(moodStats.length > 0 || violationTrades.length > 0 || cleanTrades.length > 0) && (
+        <div style={{ ...cardStyle, padding: '20px', marginBottom: '20px' }}>
+          <h2 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', marginBottom: '4px' }}>Mood & Discipline</h2>
+          <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '18px' }}>How your mindset and discipline affect your results</p>
+
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '16px' }}>
+
+            {/* Mood performance */}
+            {moodStats.length > 0 && (
+              <div>
+                <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text)', marginBottom: '10px' }}>Performance by mood</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {moodStats.sort((a, b) => (b.winRate ?? 0) - (a.winRate ?? 0)).map(m => (
+                    <div key={m.mood} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '18px', width: '24px' }}>{m.emoji}</span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+                          <span style={{ fontSize: '11px', color: 'var(--text)' }}>{m.label}</span>
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{m.total} trades · {m.pnl >= 0 ? '+' : ''}{m.pnl}%</span>
+                        </div>
+                        <div style={{ height: '6px', background: 'var(--bg-secondary)', borderRadius: '3px', overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${m.winRate ?? 0}%`, background: (m.winRate ?? 0) >= 50 ? '#30D158' : '#FF453A', borderRadius: '3px', transition: 'width 0.4s' }} />
+                        </div>
+                        <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{m.winRate !== null ? `${m.winRate}% win rate` : '--'}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Rule violation */}
+            {(violationTrades.length > 0 || cleanTrades.length > 0) && (
+              <div>
+                <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text)', marginBottom: '10px' }}>Plan discipline</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {[
+                    { label: '✅ Followed the plan', wr: cleanWR, pnl: cleanPnl, total: cleanTrades.length, color: '#30D158' },
+                    { label: '❌ Broke the rules', wr: violationWR, pnl: violationPnl, total: violationTrades.length, color: '#FF453A' },
+                  ].filter(r => r.total > 0).map(r => (
+                    <div key={r.label} style={{ background: 'var(--bg-secondary)', borderRadius: '10px', padding: '12px 14px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                        <span style={{ fontSize: '12px', color: 'var(--text)' }}>{r.label}</span>
+                        <span style={{ fontSize: '12px', fontWeight: 600, color: r.pnl >= 0 ? '#30D158' : '#FF453A' }}>{r.pnl >= 0 ? '+' : ''}{r.pnl}%</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{r.total} trades</span>
+                        <span style={{ fontSize: '11px', fontWeight: 600, color: r.color }}>{r.wr !== null ? `${r.wr}% WR` : '--'}</span>
+                      </div>
+                    </div>
+                  ))}
+                  {violationTrades.length > 0 && cleanWR !== null && violationWR !== null && (
+                    <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                      {cleanWR > violationWR
+                        ? `Following your plan gives you ${cleanWR - violationWR}% higher win rate`
+                        : `Interesting — rule violations haven't hurt win rate yet`}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+          </div>
+        </div>
+      )}
 
       {/* Recent trades */}
       <div style={cardStyle}>
