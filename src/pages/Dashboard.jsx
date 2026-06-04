@@ -398,28 +398,28 @@ export default function Dashboard() {
     }))
 
   // Entry Heatmap (hour × day of week) — uses all-time live trades (not filtered by date)
-  const DAY_KEYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-  const heatmapData = {}
-  DAY_KEYS.forEach(d => { heatmapData[d] = {} })
+  const ENTRY_DAY_KEYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  const entryHeatmap = {}
+  ENTRY_DAY_KEYS.forEach(d => { entryHeatmap[d] = {} })
   allLiveTrades.forEach(tr => {
     if (!tr.time || !tr.date) return
     const hour = parseInt(tr.time.split(':')[0], 10)
     const dayIdx = new Date(tr.date + 'T00:00:00').getDay()
-    const dayKey = DAY_KEYS[dayIdx]
-    heatmapData[dayKey][hour] = (heatmapData[dayKey][hour] || 0) + 1
+    const dayKey = ENTRY_DAY_KEYS[dayIdx]
+    entryHeatmap[dayKey][hour] = (entryHeatmap[dayKey][hour] || 0) + 1
   })
-  const heatmapHours = Array.from({ length: 18 }, (_, i) => i + 6).filter(h =>
-    DAY_KEYS.some(d => heatmapData[d][h])
-  )
-  const heatmapMax = Math.max(1, ...DAY_KEYS.flatMap(d => Object.values(heatmapData[d])))
-  const heatmapPeakHour = (() => {
+  const entryHoursSet = new Set()
+  ENTRY_DAY_KEYS.forEach(d => Object.keys(entryHeatmap[d]).forEach(h => entryHoursSet.add(parseInt(h))))
+  const entryHours = Array.from(entryHoursSet).sort((a, b) => a - b)
+  const entryHeatmapMax = Math.max(1, ...ENTRY_DAY_KEYS.flatMap(d => Object.values(entryHeatmap[d])))
+  const entryPeakHour = (() => {
     const totals = {}
-    DAY_KEYS.forEach(d => Object.entries(heatmapData[d]).forEach(([h, v]) => { totals[h] = (totals[h] || 0) + v }))
+    ENTRY_DAY_KEYS.forEach(d => Object.entries(entryHeatmap[d]).forEach(([h, v]) => { totals[h] = (totals[h] || 0) + v }))
     const best = Object.entries(totals).sort((a, b) => b[1] - a[1])[0]
     return best ? { hour: parseInt(best[0]), count: best[1] } : null
   })()
-  const heatmapPeakDay = (() => {
-    const totals = DAY_KEYS.map(d => ({ day: d, count: Object.values(heatmapData[d]).reduce((s, v) => s + v, 0) }))
+  const entryPeakDay = (() => {
+    const totals = ENTRY_DAY_KEYS.map(d => ({ day: d, count: Object.values(entryHeatmap[d]).reduce((s, v) => s + v, 0) }))
     return totals.sort((a, b) => b.count - a.count)[0]
   })()
 
@@ -2013,7 +2013,7 @@ export default function Dashboard() {
       </div>
 
       {/* Entry Heatmap */}
-      {allLiveTrades.some(tr => tr.time && tr.date) && heatmapHours.length > 0 && (
+      {allLiveTrades.length > 0 && (
         <div style={{ ...cardStyle, padding: '20px', marginBottom: '20px' }}>
           <div style={{ marginBottom: '16px' }}>
             <h2 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', marginBottom: '4px' }}>Entry time heatmap</h2>
@@ -2022,20 +2022,20 @@ export default function Dashboard() {
 
           {/* Summary cards */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginBottom: '18px' }}>
-            {heatmapPeakHour && (
+            {entryPeakHour && (
               <div style={{ background: 'var(--bg-secondary)', borderRadius: '8px', padding: '10px 14px' }}>
                 <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '3px' }}>Busiest hour</p>
                 <p style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text)' }}>
-                  {String(heatmapPeakHour.hour).padStart(2, '0')}:00
+                  {String(entryPeakHour.hour).padStart(2, '0')}:00
                 </p>
-                <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{heatmapPeakHour.count} trades total</p>
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{entryPeakHour.count} trades total</p>
               </div>
             )}
-            {heatmapPeakDay && heatmapPeakDay.count > 0 && (
+            {entryPeakDay && entryPeakDay.count > 0 && (
               <div style={{ background: 'var(--bg-secondary)', borderRadius: '8px', padding: '10px 14px' }}>
                 <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '3px' }}>Busiest day</p>
-                <p style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text)' }}>{heatmapPeakDay.day}</p>
-                <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{heatmapPeakDay.count} trades total</p>
+                <p style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text)' }}>{entryPeakDay.day}</p>
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{entryPeakDay.count} trades total</p>
               </div>
             )}
           </div>
@@ -2044,9 +2044,9 @@ export default function Dashboard() {
           <div style={{ overflowX: 'auto' }}>
             <div style={{ minWidth: '480px' }}>
               {/* Hour labels */}
-              <div style={{ display: 'grid', gridTemplateColumns: `52px repeat(${heatmapHours.length}, 1fr)`, gap: '3px', marginBottom: '3px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: `52px repeat(${entryHours.length}, 1fr)`, gap: '3px', marginBottom: '3px' }}>
                 <div />
-                {heatmapHours.map(h => (
+                {entryHours.map(h => (
                   <div key={h} style={{ fontSize: '10px', color: 'var(--text-muted)', textAlign: 'center' }}>
                     {String(h).padStart(2, '0')}:00
                   </div>
@@ -2054,11 +2054,11 @@ export default function Dashboard() {
               </div>
               {/* Day rows — Mon→Sun order */}
               {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
-                <div key={day} style={{ display: 'grid', gridTemplateColumns: `52px repeat(${heatmapHours.length}, 1fr)`, gap: '3px', marginBottom: '3px' }}>
+                <div key={day} style={{ display: 'grid', gridTemplateColumns: `52px repeat(${entryHours.length}, 1fr)`, gap: '3px', marginBottom: '3px' }}>
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '8px' }}>{day}</div>
-                  {heatmapHours.map(h => {
-                    const val = heatmapData[day][h] || 0
-                    const pct = val / heatmapMax
+                  {entryHours.map(h => {
+                    const val = entryHeatmap[day][h] || 0
+                    const pct = val / entryHeatmapMax
                     const bg = val === 0 ? 'var(--bg-secondary)'
                       : pct < 0.25 ? '#1d4ed8' + '33'
                       : pct < 0.5 ? '#1d4ed8' + '66'
