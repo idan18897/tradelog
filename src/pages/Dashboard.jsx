@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useIsMobile } from '../hooks/useIsMobile'
 import { Link } from 'react-router-dom'
 import {
@@ -2993,7 +2994,7 @@ export default function Dashboard() {
       )}
 
       {/* Claude Chat Widget */}
-      <div style={{ position: 'fixed', bottom: '24px', left: '24px', zIndex: 1000 }}>
+      {createPortal(<div style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 9999 }}>
         {claudeOpen && (
           <div style={{
             position: 'absolute', bottom: '64px', left: 0,
@@ -3074,7 +3075,7 @@ export default function Dashboard() {
         }}>
           {claudeOpen ? '×' : '✦'}
         </button>
-      </div>
+      </div>, document.body)}
       </> }
     </div>
     </>
