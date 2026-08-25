@@ -53,6 +53,7 @@ export default function TopNav() {
     { to: '/', label: t.dashboard, end: true },
     { to: '/journal', label: t.journal },
     { to: '/new', label: t.newTrade },
+    { to: '/playbook', label: 'Playbook' },
   ]
 
   const navLinkStyle = ({ isActive }) => ({
