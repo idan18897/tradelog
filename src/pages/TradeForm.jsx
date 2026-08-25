@@ -1370,6 +1370,77 @@ export default function TradeForm() {
                             <div><label style={labelStyle}>Point Value ($)</label><input type="number" step="any" min="0" value={formData.point_value} onChange={e => handleField('point_value', e.target.value)} style={inputStyle} placeholder="20" /></div>
                           </>
                         )}
+                        {/* ── Position Size Calculator ── */}
+                        {accountSize > 0 && formData.risk_pct && formData.sl_pips && parseFloat(formData.sl_pips) > 0 && (() => {
+                          const dollarRisk = (parseFloat(formData.risk_pct) || 0) / 100 * accountSize
+                          const slPips = parseFloat(formData.sl_pips) || 0
+
+                          let result = null
+                          if (instrumentType === 'forex') {
+                            // Pip value per standard lot ≈ $10 (works for majors, minors, XAUUSD via getPipSize)
+                            const pipValPerLot = 10
+                            const lots = dollarRisk / (slPips * pipValPerLot)
+                            const roundedLots = parseFloat(lots.toFixed(2))
+                            const standardLots = Math.floor(roundedLots)
+                            const miniLots = Math.floor((roundedLots - standardLots) * 10)
+                            const microLots = Math.round(((roundedLots - standardLots) * 10 - miniLots) * 10)
+                            result = {
+                              main: `${roundedLots.toFixed(2)} lots`,
+                              breakdown: [
+                                standardLots > 0 ? `${standardLots} standard` : null,
+                                miniLots > 0 ? `${miniLots} mini` : null,
+                                microLots > 0 ? `${microLots} micro` : null,
+                              ].filter(Boolean).join(' + ') || (roundedLots < 0.01 ? 'too small — reduce SL or increase risk' : null),
+                              note: 'Approximate · verify with broker',
+                            }
+                          } else if (instrumentType === 'stocks') {
+                            const entry = parseFloat(formData.entry)
+                            const sl = parseFloat(formData.sl)
+                            if (entry && sl && entry !== sl) {
+                              const slDollar = Math.abs(entry - sl)
+                              const shares = Math.floor(dollarRisk / slDollar)
+                              result = {
+                                main: `${shares.toLocaleString()} shares`,
+                                breakdown: shares > 0 ? `$${slDollar.toFixed(2)} SL per share` : null,
+                                note: null,
+                              }
+                            }
+                          } else if (instrumentType === 'indices') {
+                            const pv = parseFloat(formData.point_value) || 20
+                            const contracts = dollarRisk / (slPips * pv)
+                            result = {
+                              main: `${contracts.toFixed(2)} contracts`,
+                              breakdown: `@ $${pv} per point`,
+                              note: 'Round to nearest whole contract',
+                            }
+                          }
+
+                          if (!result) return null
+                          return (
+                            <div style={{
+                              gridColumn: '1 / -1',
+                              background: 'rgba(0,122,255,0.07)',
+                              border: '1px solid rgba(0,122,255,0.2)',
+                              borderRadius: '12px',
+                              padding: '14px 16px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              flexWrap: 'wrap',
+                              gap: '8px',
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                                <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Position Size</span>
+                                <span style={{ fontSize: '20px', fontWeight: 800, color: 'var(--accent)', letterSpacing: '-0.02em' }}>{result.main}</span>
+                                {result.breakdown && <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500 }}>{result.breakdown}</span>}
+                              </div>
+                              <div style={{ textAlign: 'right' }}>
+                                <p style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text)' }}>${dollarRisk.toFixed(0)} at risk</p>
+                                {result.note && <p style={{ fontSize: '10px', color: 'var(--text-subtle)', marginTop: '2px' }}>{result.note}</p>}
+                              </div>
+                            </div>
+                          )
+                        })()}
                       </div>
                     </div>
                   )}
