@@ -521,22 +521,27 @@ export default function TradeForm() {
       if (!isEditing && !duplicateData && data.default_pair) {
         setFormData(prev => ({ ...prev, pair: data.default_pair }))
       }
-      // Override with last-used pair/direction/type/date from localStorage
+      // Auto-fill from last saved trade (Supabase)
       if (!isEditing && !duplicateData) {
         try {
-          const lastPair = localStorage.getItem('tradeform_last_pair')
-          const lastDir = localStorage.getItem('tradeform_last_direction')
-          const lastType = localStorage.getItem('tradeform_last_type')
-          const lastDate = localStorage.getItem('tradeform_last_date')
-          const lastDateTs = parseInt(localStorage.getItem('tradeform_last_date_ts') || '0', 10)
-          const dateIsRecent = Date.now() - lastDateTs < 4 * 60 * 60 * 1000 // 4 hours
-          setFormData(prev => ({
-            ...prev,
-            ...(lastPair ? { pair: lastPair } : {}),
-            ...(lastDir ? { direction: lastDir } : {}),
-            ...(lastType ? { trade_type: lastType } : {}),
-            ...(lastDate && dateIsRecent ? { date: lastDate } : {}),
-          }))
+          const { data: lastTrade } = await supabase
+            .from('trades')
+            .select('pair, direction, trade_type, date')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single()
+          if (lastTrade) {
+            const lastDateTs = new Date(lastTrade.date).getTime()
+            const dateIsRecent = Date.now() - lastDateTs < 7 * 24 * 60 * 60 * 1000 // within last 7 days
+            setFormData(prev => ({
+              ...prev,
+              ...(lastTrade.pair ? { pair: lastTrade.pair } : {}),
+              ...(lastTrade.direction ? { direction: lastTrade.direction } : {}),
+              ...(lastTrade.trade_type ? { trade_type: lastTrade.trade_type } : {}),
+              ...(lastTrade.date && dateIsRecent ? { date: lastTrade.date } : {}),
+            }))
+          }
         } catch (_) {}
       }
       if (!isEditing && data.default_outcome) {
@@ -847,10 +852,7 @@ export default function TradeForm() {
         }
       }
 
-      try { localStorage.setItem('tradeform_last_pair', formData.pair) } catch(_) {}
-      try { localStorage.setItem('tradeform_last_direction', formData.direction) } catch(_) {}
-      try { localStorage.setItem('tradeform_last_type', formData.trade_type) } catch(_) {}
-      try { localStorage.setItem('tradeform_last_date', formData.date); localStorage.setItem('tradeform_last_date_ts', String(Date.now())) } catch(_) {}
+
       navigate('/journal')
     } catch (err) {
       setError(err.message || 'אירעה שגיאה')
