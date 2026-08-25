@@ -521,18 +521,22 @@ export default function TradeForm() {
       if (!isEditing && !duplicateData && data.default_pair) {
         setFormData(prev => ({ ...prev, pair: data.default_pair }))
       }
-      // Override with last-used pair/direction from localStorage
+      // Override with last-used pair/direction/type/date from localStorage
       if (!isEditing && !duplicateData) {
         try {
           const lastPair = localStorage.getItem('tradeform_last_pair')
           const lastDir = localStorage.getItem('tradeform_last_direction')
-          if (lastPair || lastDir) {
-            setFormData(prev => ({
-              ...prev,
-              ...(lastPair ? { pair: lastPair } : {}),
-              ...(lastDir ? { direction: lastDir } : {}),
-            }))
-          }
+          const lastType = localStorage.getItem('tradeform_last_type')
+          const lastDate = localStorage.getItem('tradeform_last_date')
+          const lastDateTs = parseInt(localStorage.getItem('tradeform_last_date_ts') || '0', 10)
+          const dateIsRecent = Date.now() - lastDateTs < 4 * 60 * 60 * 1000 // 4 hours
+          setFormData(prev => ({
+            ...prev,
+            ...(lastPair ? { pair: lastPair } : {}),
+            ...(lastDir ? { direction: lastDir } : {}),
+            ...(lastType ? { trade_type: lastType } : {}),
+            ...(lastDate && dateIsRecent ? { date: lastDate } : {}),
+          }))
         } catch (_) {}
       }
       if (!isEditing && data.default_outcome) {
@@ -845,6 +849,8 @@ export default function TradeForm() {
 
       try { localStorage.setItem('tradeform_last_pair', formData.pair) } catch(_) {}
       try { localStorage.setItem('tradeform_last_direction', formData.direction) } catch(_) {}
+      try { localStorage.setItem('tradeform_last_type', formData.trade_type) } catch(_) {}
+      try { localStorage.setItem('tradeform_last_date', formData.date); localStorage.setItem('tradeform_last_date_ts', String(Date.now())) } catch(_) {}
       navigate('/journal')
     } catch (err) {
       setError(err.message || 'אירעה שגיאה')

@@ -161,9 +161,9 @@ function Lightbox({ src, label, onClose }) {
     fontSize: '14px', fontWeight: 600, lineHeight: 1, transition: 'background 0.15s',
   }
 
-  return (
+  return createPortal(
     <div
-      style={{ position: 'fixed', inset: 0, zIndex: 2000, background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
       onClick={e => { e.stopPropagation(); onClose() }}
     >
       {/* Wrapper — sized to image, toolbar glued on top */}
@@ -218,7 +218,7 @@ function Lightbox({ src, label, onClose }) {
         </div>
       </div>
     </div>
-  )
+  , document.body)
 }
 
 function DetailField({ label, value, children }) {
@@ -2073,7 +2073,7 @@ function JournalInner() {
       })(), document.body)}
 
       {/* Lightbox */}
-      {lightbox && createPortal(<Lightbox src={lightbox.src} label={lightbox.label} onClose={() => setLightbox(null)} />, document.body)}
+      {lightbox && <Lightbox src={lightbox.src} label={lightbox.label} onClose={() => setLightbox(null)} />}
     </div>
   )
 }
