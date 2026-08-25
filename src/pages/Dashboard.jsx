@@ -1953,6 +1953,53 @@ export default function Dashboard() {
       {/* ── Overview Tab ── */}
       {dashTab === 'overview' && <>
 
+      {/* Portfolio Value Card */}
+      {accountSize > 0 && (() => {
+        const periodPnlPct = equityFinal
+        const periodPnlDollar = (periodPnlPct / 100) * accountSize
+        const currentValue = accountSize + periodPnlDollar
+        const isPos = periodPnlPct >= 0
+        const pnlColor = isPos ? '#30D158' : '#FF453A'
+        const periodLabel = dateFilter.type === 'all'
+          ? 'All Time'
+          : dateFilter.type === 'month'
+          ? navMonthLabel
+          : dateFilter.type === 'year'
+          ? String(new Date().getFullYear() - navOffset)
+          : 'Selected Period'
+        return (
+          <div style={{ ...cardStyle, padding: '20px 24px', marginBottom: '14px', background: 'var(--card)', borderRadius: '18px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+              {/* Left: Account value */}
+              <div>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px', fontWeight: 500 }}>Portfolio Value · {periodLabel}</p>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: isMobile ? '28px' : '36px', fontWeight: 800, letterSpacing: '-0.04em', color: 'var(--text)' }}>
+                    ${currentValue.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                  </span>
+                  <span style={{ fontSize: '15px', fontWeight: 700, color: pnlColor }}>
+                    {isPos ? '▲' : '▼'} {isPos ? '+' : ''}{periodPnlPct.toFixed(2)}%
+                  </span>
+                </div>
+                <p style={{ fontSize: '12px', color: pnlColor, fontWeight: 600, marginTop: '4px' }}>
+                  {isPos ? '+' : ''}${periodPnlDollar.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} this period
+                </p>
+              </div>
+              {/* Right: Starting capital */}
+              {!isMobile && (
+                <div style={{ textAlign: 'right' }}>
+                  <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>Starting Capital</p>
+                  <p style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-muted)' }}>
+                    ${accountSize.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                  </p>
+                  <p style={{ fontSize: '11px', color: 'var(--text-subtle)', marginTop: '3px' }}>{closedTrades.length} closed trades</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Stats cards */}
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: '14px', marginBottom: '20px' }}
         className="lg:grid-cols-4">
