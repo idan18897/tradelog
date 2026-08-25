@@ -80,6 +80,9 @@ export default function Dashboard() {
   const [goalToast, setGoalToast] = useState(null)
   const [confettiPieces, setConfettiPieces] = useState([])
   const achievedGoalsRef = useRef(new Set())
+  const [aiInsights, setAiInsights] = useState('')
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState('')
   const [claudeOpen, setClaudeOpen] = useState(false)
   const [claudeQuestion, setClaudeQuestion] = useState('')
   const [claudeLoading, setClaudeLoading] = useState(false)
@@ -1351,6 +1354,50 @@ export default function Dashboard() {
         </Link>
       </div>
     )
+  }
+
+  const fetchAIInsights = async () => {
+    setAiLoading(true)
+    setAiError('')
+    try {
+      const closedLive = liveTrades.filter(t => ['TP','Partial TP','SL','BE'].includes(t.outcome))
+      const tp = closedLive.filter(t => t.outcome === 'TP' || t.outcome === 'Partial TP').length
+      const sl = closedLive.filter(t => t.outcome === 'SL').length
+      const totalPnL = closedLive.reduce((s, t) => s + computePnL(t), 0)
+      const avgRR = closedLive.length ? (closedLive.reduce((s, t) => s + (Number(t.rr_potential) || 0), 0) / closedLive.length).toFixed(2) : 0
+      const byDay = {}
+      const byPair = {}
+      const byHour = {}
+      closedLive.forEach(t => {
+        if (t.day) { byDay[t.day] = byDay[t.day] || { tp: 0, total: 0 }; byDay[t.day].total++; if (t.outcome === 'TP' || t.outcome === 'Partial TP') byDay[t.day].tp++ }
+        if (t.pair) { byPair[t.pair] = byPair[t.pair] || { pnl: 0, total: 0 }; byPair[t.pair].total++; byPair[t.pair].pnl += computePnL(t) }
+        if (t.time) { const h = parseInt(t.time.split(':')[0], 10); byHour[h] = byHour[h] || { tp: 0, total: 0 }; byHour[h].total++; if (t.outcome === 'TP' || t.outcome === 'Partial TP') byHour[h].tp++ }
+      })
+      const stats = {
+        totalTrades: closedLive.length,
+        winRate: closedLive.length ? Math.round(tp / closedLive.length * 100) : 0,
+        tp, sl,
+        totalPnL: parseFloat(totalPnL.toFixed(2)),
+        avgRR: parseFloat(avgRR),
+        missedTrades: missedTrades.length,
+        performanceByDay: byDay,
+        performanceByPair: byPair,
+        performanceByHour: byHour,
+        dateRange: dateFilter,
+      }
+      const res = await fetch('/api/ai-insights', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stats }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed')
+      setAiInsights(data.insights)
+    } catch (err) {
+      setAiError(err.message || 'Failed to generate insights')
+    } finally {
+      setAiLoading(false)
+    }
   }
 
   const askClaude = async () => {
@@ -3825,6 +3872,48 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* AI Coach Insights */}
+      <div style={{ ...cardStyle, padding: '22px', marginBottom: '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: aiInsights ? '18px' : '0' }}>
+          <div>
+            <h2 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text)', marginBottom: '3px', letterSpacing: '-0.01em' }}>✦ AI Coach Insights</h2>
+            <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Personalized analysis of your current period's trading data</p>
+          </div>
+          <button
+            onClick={fetchAIInsights}
+            disabled={aiLoading || liveTrades.filter(t => ['TP','Partial TP','SL','BE'].includes(t.outcome)).length < 3}
+            style={{ padding: '8px 18px', borderRadius: '20px', border: 'none', background: aiLoading ? 'var(--border)' : 'var(--accent)', color: aiLoading ? 'var(--text-muted)' : '#fff', fontSize: '12px', fontWeight: 600, cursor: aiLoading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, transition: 'all 0.15s' }}
+          >
+            {aiLoading ? (
+              <><span style={{ width: '12px', height: '12px', border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.65s linear infinite' }} />Analyzing...</>
+            ) : aiInsights ? 'Regenerate' : 'Generate Insights'}
+          </button>
+        </div>
+        {aiError && <p style={{ fontSize: '12px', color: '#FF453A', marginTop: '12px' }}>{aiError}</p>}
+        {aiInsights && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {aiInsights.split(/
+(?=\d+\.)/).filter(s => s.trim()).map((line, i) => (
+              <div key={i} style={{ padding: '14px 16px', borderRadius: '12px', background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
+                <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.65, margin: 0 }}
+                  dangerouslySetInnerHTML={{ __html: line.trim()
+                    .replace(/\*\*(.*?)\*\*/g, '<span style="color:var(--accent);font-weight:700">$1</span>')
+                    .replace(/^(\d+\.\s*)/, '<span style="font-weight:700;color:var(--text)">$1</span>')
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+        {!aiInsights && !aiLoading && !aiError && (
+          <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '12px' }}>
+            {liveTrades.filter(t => ['TP','Partial TP','SL','BE'].includes(t.outcome)).length < 3
+              ? 'Need at least 3 closed trades in the selected period to generate insights.'
+              : 'Click "Generate Insights" to get AI-powered coaching based on your trades.'}
+          </p>
+        )}
+      </div>
 
       {/* Claude Chat Widget */}
       {createPortal(<div style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 9999 }}>

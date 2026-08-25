@@ -318,7 +318,7 @@ export default function TradeForm() {
   const { t } = useLang()
   const isMobile = useIsMobile()
   const navigate = useNavigate()
-  const { plan, continuationEnabled, continuationWindowDays, longColor, shortColor, accountSize } = useUserSettings()
+  const { plan, continuationEnabled, continuationWindowDays, longColor, shortColor, accountSize, tradeChecklist } = useUserSettings()
   const { theme } = useTheme()
   // Ensure direction colors are visible in light mode (darken if too light)
   function visibleColor(hex) {
@@ -330,6 +330,9 @@ export default function TradeForm() {
   const longVis = visibleColor(longColor)
   const shortVis = visibleColor(shortColor)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+  const [showChecklistModal, setShowChecklistModal] = useState(false)
+  const [checklistChecked, setChecklistChecked] = useState(new Set())
+  const checklistClearedRef = useRef(false)
 
   const [formData, setFormData] = useState({
     date: today(),
@@ -764,6 +767,14 @@ export default function TradeForm() {
       }
     }
 
+    // Pre-trade checklist gate (only for new live trades)
+    if (!isEditing && tradeChecklist?.length > 0 && !checklistClearedRef.current) {
+      setChecklistChecked(new Set())
+      setShowChecklistModal(true)
+      return
+    }
+    checklistClearedRef.current = false
+
     setLoading(true)
 
     try {
@@ -928,6 +939,40 @@ export default function TradeForm() {
       style={{ padding: '28px 32px', maxWidth: '1100px', margin: '0 auto' }}
     >
       {showUpgradeModal && <UpgradeModal onClose={() => setShowUpgradeModal(false)} />}
+      {/* Pre-Trade Checklist Modal */}
+      {showChecklistModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setShowChecklistModal(false)}>
+          <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '16px', padding: '24px', width: '100%', maxWidth: '420px', boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text)', marginBottom: '6px' }}>Pre-Trade Checklist</h3>
+            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '20px' }}>Confirm all items before saving your trade</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
+              {tradeChecklist.map((item, idx) => {
+                const checked = checklistChecked.has(idx)
+                return (
+                  <div key={idx} onClick={() => setChecklistChecked(prev => { const n = new Set(prev); checked ? n.delete(idx) : n.add(idx); return n })} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', borderRadius: '10px', border: `1px solid ${checked ? 'var(--accent)' : 'var(--border)'}`, background: checked ? 'var(--accent-light)' : 'var(--bg)', cursor: 'pointer', transition: 'all 0.15s' }}>
+                    <div style={{ width: '20px', height: '20px', borderRadius: '6px', border: `2px solid ${checked ? 'var(--accent)' : 'var(--border-strong)'}`, background: checked ? 'var(--accent)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s' }}>
+                      {checked && <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                    </div>
+                    <span style={{ fontSize: '13px', fontWeight: 500, color: checked ? 'var(--accent)' : 'var(--text)' }}>{item}</span>
+                  </div>
+                )
+              })}
+            </div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={() => setShowChecklistModal(false)} style={{ flex: 1, padding: '11px', borderRadius: '10px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', fontSize: '13px', cursor: 'pointer' }}>Cancel</button>
+              <button
+                disabled={checklistChecked.size < tradeChecklist.length}
+                onClick={() => {
+                  setShowChecklistModal(false)
+                  checklistClearedRef.current = true
+                  handleSubmit()
+                }}
+                style={{ flex: 1, padding: '11px', borderRadius: '10px', border: 'none', background: checklistChecked.size >= tradeChecklist.length ? 'var(--accent)' : 'var(--border)', color: checklistChecked.size >= tradeChecklist.length ? '#fff' : 'var(--text-muted)', fontSize: '13px', fontWeight: 600, cursor: checklistChecked.size >= tradeChecklist.length ? 'pointer' : 'not-allowed', transition: 'all 0.15s' }}
+              >{checklistChecked.size}/{tradeChecklist.length} — {checklistChecked.size >= tradeChecklist.length ? 'Confirm & Save ✓' : 'Check all items'}</button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Save Template Modal */}
       {showSaveModal && (
         <div style={{

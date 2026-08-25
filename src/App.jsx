@@ -12,6 +12,7 @@ import TradeForm from './pages/TradeForm'
 import Settings from './pages/Settings'
 import Landing from './pages/Landing'
 import Review from './pages/Review'
+import Playbook from './pages/Playbook'
 import Calculator from './pages/Calculator'
 import WelcomeModal from './components/WelcomeModal'
 import OnboardingModal from './components/OnboardingModal'
@@ -112,6 +113,7 @@ function AppRoutes() {
           <Route path="settings" element={<Settings />} />
           <Route path="review" element={<Review />} />
           <Route path="calc" element={<Calculator />} />
+          <Route path="playbook" element={<Playbook />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

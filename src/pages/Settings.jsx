@@ -102,7 +102,7 @@ function SortableItem({ item, onDelete }) {
 export default function Settings() {
   const { user } = useAuth()
   const { t } = useLang()
-  const { updateColors, plan, accountSize: ctxAccountSize, setAccountSize: ctxSetAccountSize, showDollarValues: ctxShowDollar, setShowDollarValues: ctxSetShowDollar, dailyReminder: ctxDailyReminder, setDailyReminder: ctxSetDailyReminder, reminderTime: ctxReminderTime, setReminderTime: ctxSetReminderTime, setGoalMonthlyPnl: ctxSetGoalMonthlyPnl, setGoalWinRate: ctxSetGoalWinRate, setGoalTradesCount: ctxSetGoalTradesCount, setGoalAvgRR: ctxSetGoalAvgRR, setContinuationEnabled: ctxSetContinuationEnabled, setContinuationWindowDays: ctxSetContinuationWindowDays, setPropEnabled: ctxSetPropEnabled, setPropDailyLimit: ctxSetPropDailyLimit, setPropTotalLimit: ctxSetPropTotalLimit } = useUserSettings()
+  const { updateColors, plan, accountSize: ctxAccountSize, setAccountSize: ctxSetAccountSize, showDollarValues: ctxShowDollar, setShowDollarValues: ctxSetShowDollar, dailyReminder: ctxDailyReminder, setDailyReminder: ctxSetDailyReminder, reminderTime: ctxReminderTime, setReminderTime: ctxSetReminderTime, setGoalMonthlyPnl: ctxSetGoalMonthlyPnl, setGoalWinRate: ctxSetGoalWinRate, setGoalTradesCount: ctxSetGoalTradesCount, setGoalAvgRR: ctxSetGoalAvgRR, setContinuationEnabled: ctxSetContinuationEnabled, setContinuationWindowDays: ctxSetContinuationWindowDays, setPropEnabled: ctxSetPropEnabled, setPropDailyLimit: ctxSetPropDailyLimit, setPropTotalLimit: ctxSetPropTotalLimit, tradeChecklist: ctxTradeChecklist, setTradeChecklist: ctxSetTradeChecklist } = useUserSettings()
   const [accountSize, setAccountSizeLocal] = useState(ctxAccountSize || 10000)
   const [showDollarValues, setShowDollarValuesLocal] = useState(ctxShowDollar || false)
   const [dailyReminder, setDailyReminderLocal] = useState(ctxDailyReminder || false)
@@ -170,6 +170,8 @@ export default function Settings() {
   const [propEnabled, setPropEnabledLocal] = useState(false)
   const [propDailyLimit, setPropDailyLimitLocal] = useState('5')
   const [propTotalLimit, setPropTotalLimitLocal] = useState('10')
+  const [checklistLocal, setChecklistLocal] = useState([])
+  const [newChecklistItem, setNewChecklistItem] = useState('')
 
   // Change password
   const [currentPassword, setCurrentPassword] = useState('')
@@ -337,6 +339,7 @@ export default function Settings() {
       if (data.prop_enabled != null) setPropEnabledLocal(data.prop_enabled)
       if (data.prop_daily_loss_limit != null) setPropDailyLimitLocal(String(data.prop_daily_loss_limit))
       if (data.prop_total_loss_limit != null) setPropTotalLimitLocal(String(data.prop_total_loss_limit))
+      if (Array.isArray(data.trade_checklist)) setChecklistLocal(data.trade_checklist)
     } else {
       setPairs(DEFAULT_PAIRS)
     }
@@ -369,6 +372,7 @@ export default function Settings() {
       prop_enabled: propEnabled,
       prop_daily_loss_limit: parseFloat(propDailyLimit) || 5,
       prop_total_loss_limit: parseFloat(propTotalLimit) || 10,
+      trade_checklist: checklistLocal,
     }, { onConflict: 'user_id' })
     setSaving(false)
     if (error) {
@@ -389,6 +393,7 @@ export default function Settings() {
       ctxSetPropEnabled(propEnabled)
       ctxSetPropDailyLimit(parseFloat(propDailyLimit) || 5)
       ctxSetPropTotalLimit(parseFloat(propTotalLimit) || 10)
+      ctxSetTradeChecklist(checklistLocal)
       // sync localStorage for reminder scheduler
       localStorage.setItem('reminder_enabled', dailyReminder ? '1' : '0')
       localStorage.setItem('reminder_time', reminderTime)
@@ -883,6 +888,51 @@ export default function Settings() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Pre-Trade Checklist */}
+      {activeTab === 'trading' && (
+        <div style={cardStyle}>
+          <p style={sectionTitle}>Pre-Trade Checklist</p>
+          <p style={sectionSub}>Items you must confirm before logging any new live trade</p>
+          {checklistLocal.length === 0 && (
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '12px' }}>No items yet — add rules below.</p>
+          )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '14px' }}>
+            {checklistLocal.map((item, idx) => (
+              <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--bg)', borderRadius: '8px', padding: '8px 12px' }}>
+                <span style={{ fontSize: '13px', color: 'var(--text-muted)', fontSize: '16px' }}>☐</span>
+                <span style={{ flex: 1, fontSize: '13px', color: 'var(--text)' }}>{item}</span>
+                <button onClick={() => { setChecklistLocal(prev => prev.filter((_, i) => i !== idx)); setIsDirty(true) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#FF453A', fontSize: '18px', lineHeight: 1 }}>×</button>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <input
+              value={newChecklistItem}
+              onChange={e => setNewChecklistItem(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && newChecklistItem.trim()) {
+                  e.preventDefault()
+                  setChecklistLocal(prev => [...prev, newChecklistItem.trim()])
+                  setNewChecklistItem('')
+                  setIsDirty(true)
+                }
+              }}
+              placeholder="e.g. HTF bias confirmed"
+              style={{ ...inputStyle, flex: 1 }}
+            />
+            <button
+              onClick={() => {
+                if (!newChecklistItem.trim()) return
+                setChecklistLocal(prev => [...prev, newChecklistItem.trim()])
+                setNewChecklistItem('')
+                setIsDirty(true)
+              }}
+              style={{ padding: '8px 16px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}
+            >Add</button>
+          </div>
         </div>
       )}
 

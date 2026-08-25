@@ -40,6 +40,7 @@ export function UserSettingsProvider({ children }) {
   const [propEnabled, setPropEnabled] = useState(false)
   const [propDailyLimit, setPropDailyLimit] = useState(5)
   const [propTotalLimit, setPropTotalLimit] = useState(10)
+  const [tradeChecklist, setTradeChecklist] = useState([])
 
   useEffect(() => {
     applyColors(DEFAULT_LONG, DEFAULT_SHORT)
@@ -101,6 +102,16 @@ export function UserSettingsProvider({ children }) {
         if (data.continuation_enabled != null) setContinuationEnabled(data.continuation_enabled)
         if (data.continuation_window_days != null) setContinuationWindowDays(data.continuation_window_days)
       })
+    // Trade checklist — separate query
+    supabase
+      .from('user_settings')
+      .select('trade_checklist')
+      .eq('user_id', user.id)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error || !data) return
+        if (Array.isArray(data.trade_checklist)) setTradeChecklist(data.trade_checklist)
+      })
   }, [user])
 
   function updateColors(long, short) {
@@ -110,7 +121,7 @@ export function UserSettingsProvider({ children }) {
   }
 
   return (
-    <UserSettingsContext.Provider value={{ longColor, shortColor, updateColors, plan, accountSize, setAccountSize, showDollarValues, setShowDollarValues, dailyReminder, setDailyReminder, reminderTime, setReminderTime, goalMonthlyPnl, setGoalMonthlyPnl, goalWinRate, setGoalWinRate, goalTradesCount, setGoalTradesCount, goalAvgRR, setGoalAvgRR, continuationEnabled, setContinuationEnabled, continuationWindowDays, setContinuationWindowDays, propEnabled, setPropEnabled, propDailyLimit, setPropDailyLimit, propTotalLimit, setPropTotalLimit }}>
+    <UserSettingsContext.Provider value={{ longColor, shortColor, updateColors, plan, accountSize, setAccountSize, showDollarValues, setShowDollarValues, dailyReminder, setDailyReminder, reminderTime, setReminderTime, goalMonthlyPnl, setGoalMonthlyPnl, goalWinRate, setGoalWinRate, goalTradesCount, setGoalTradesCount, goalAvgRR, setGoalAvgRR, continuationEnabled, setContinuationEnabled, continuationWindowDays, setContinuationWindowDays, propEnabled, setPropEnabled, propDailyLimit, setPropDailyLimit, propTotalLimit, setPropTotalLimit, tradeChecklist, setTradeChecklist }}>
       {children}
     </UserSettingsContext.Provider>
   )
