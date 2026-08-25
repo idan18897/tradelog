@@ -2073,7 +2073,7 @@ function JournalInner() {
       })(), document.body)}
 
       {/* Lightbox */}
-      {lightbox && <Lightbox src={lightbox.src} label={lightbox.label} onClose={() => setLightbox(null)} />}
+      {lightbox && createPortal(<Lightbox src={lightbox.src} label={lightbox.label} onClose={() => setLightbox(null)} />, document.body)}
     </div>
   )
 }
