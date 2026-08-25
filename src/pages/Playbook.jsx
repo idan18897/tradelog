@@ -31,10 +31,24 @@ function SetupModal({ setup, onSave, onClose }) {
     setup_type: setup?.setup_type || '',
     description: setup?.description || '',
     rules: setup?.rules || [''],
-    confirmations: setup?.confirmations || [''],
+    confirmations: setup?.confirmations || [],
     notes: setup?.notes || '',
     color: setup?.color || '#0A84FF',
   })
+
+  const { user } = useAuth()
+  const [confLibrary, setConfLibrary] = useState([])
+  useEffect(() => {
+    supabase.from('confirmations_library').select('label').eq('user_id', user.id).order('sort_order')
+      .then(({ data }) => setConfLibrary((data || []).map(d => d.label)))
+  }, [user])
+
+  const toggleConf = (label) => setForm(p => ({
+    ...p,
+    confirmations: p.confirmations.includes(label)
+      ? p.confirmations.filter(c => c !== label)
+      : [...p.confirmations, label]
+  }))
 
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
   const setArr = (k, idx, v) => setForm(p => ({ ...p, [k]: p[k].map((x, i) => i === idx ? v : x) }))
@@ -46,7 +60,7 @@ function SetupModal({ setup, onSave, onClose }) {
     onSave({
       ...form,
       rules: form.rules.filter(r => r.trim()),
-      confirmations: form.confirmations.filter(c => c.trim()),
+      confirmations: form.confirmations,
     })
   }
 
@@ -102,16 +116,26 @@ function SetupModal({ setup, onSave, onClose }) {
           <button onClick={() => addArr('rules')} style={{ fontSize: '12px', color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0' }}>+ Add rule</button>
         </div>
 
-        {/* Required Confirmations */}
+        {/* Required Confirmations — from library */}
         <div style={{ marginBottom: '14px' }}>
           <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Required Confirmations</label>
-          {form.confirmations.map((conf, idx) => (
-            <div key={idx} style={{ display: 'flex', gap: '6px', marginBottom: '6px' }}>
-              <input value={conf} onChange={e => setArr('confirmations', idx, e.target.value)} placeholder={`Confirmation ${idx + 1} (e.g. MSS, OB, FVG)`} style={{ ...inputStyle, flex: 1 }} />
-              {form.confirmations.length > 1 && <button onClick={() => removeArr('confirmations', idx)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#FF453A', fontSize: '18px' }}>×</button>}
+          {confLibrary.length > 0 ? (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+              {confLibrary.map(label => {
+                const selected = form.confirmations.includes(label)
+                return (
+                  <button key={label} onClick={() => toggleConf(label)} style={{ padding: '5px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: `1px solid ${selected ? 'var(--accent)' : 'var(--border)'}`, background: selected ? 'var(--accent-light)' : 'var(--bg)', color: selected ? 'var(--accent)' : 'var(--text-muted)', transition: 'all 0.15s' }}>
+                    {selected ? '✓ ' : ''}{label}
+                  </button>
+                )
+              })}
             </div>
-          ))}
-          <button onClick={() => addArr('confirmations')} style={{ fontSize: '12px', color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0' }}>+ Add confirmation</button>
+          ) : (
+            <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Add confirmations in Settings → Trading first</p>
+          )}
+          {form.confirmations.length > 0 && (
+            <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' }}>Selected: {form.confirmations.join(', ')}</p>
+          )}
         </div>
 
         {/* Notes */}
