@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
+import { useUserSettings } from '../context/UserSettingsContext'
 
 const cardStyle = {
   background: 'var(--card)',
@@ -21,11 +22,9 @@ const inputStyle = {
   fontFamily: 'inherit',
 }
 
-const SETUP_TYPES = ['BOS + OB', 'FVG Retest', 'Liquidity Grab', 'Trend Follow', 'Break & Retest', 'Session Open', 'News Play', 'Other']
-
 const ACCENT_COLORS = ['#0A84FF', '#30D158', '#FF9F0A', '#FF453A', '#BF5AF2', '#32ADE6', '#FF6961', '#64D2FF']
 
-function SetupModal({ setup, onSave, onClose }) {
+function SetupModal({ setup, onSave, onClose, setupTypes }) {
   const [form, setForm] = useState({
     name: setup?.name || '',
     setup_type: setup?.setup_type || '',
@@ -37,6 +36,7 @@ function SetupModal({ setup, onSave, onClose }) {
   })
 
   const { user } = useAuth()
+  const { playbookSetupTypes } = useUserSettings()
   const [confLibrary, setConfLibrary] = useState([])
   useEffect(() => {
     supabase.from('confirmations_library').select('label').eq('user_id', user.id).order('sort_order')
@@ -79,7 +79,7 @@ function SetupModal({ setup, onSave, onClose }) {
         <div style={{ marginBottom: '14px' }}>
           <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Setup Type</label>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-            {SETUP_TYPES.map(t => (
+            {(setupTypes || []).map(t => (
               <button key={t} onClick={() => set('setup_type', t === form.setup_type ? '' : t)}
                 style={{ padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', border: `1px solid ${form.setup_type === t ? 'var(--accent)' : 'var(--border)'}`, background: form.setup_type === t ? 'var(--accent-light)' : 'var(--bg)', color: form.setup_type === t ? 'var(--accent)' : 'var(--text-muted)' }}>
                 {t}
@@ -155,6 +155,7 @@ function SetupModal({ setup, onSave, onClose }) {
 
 export default function Playbook() {
   const { user } = useAuth()
+  const { playbookSetupTypes } = useUserSettings()
   const [setups, setSetups] = useState([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
@@ -207,6 +208,7 @@ export default function Playbook() {
           setup={editingSetup}
           onSave={handleSave}
           onClose={() => { setShowModal(false); setEditingSetup(null) }}
+          setupTypes={playbookSetupTypes}
         />
       )}
 

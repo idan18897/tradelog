@@ -41,6 +41,7 @@ export function UserSettingsProvider({ children }) {
   const [propDailyLimit, setPropDailyLimit] = useState(5)
   const [propTotalLimit, setPropTotalLimit] = useState(10)
   const [tradeChecklist, setTradeChecklist] = useState([])
+  const [playbookSetupTypes, setPlaybookSetupTypes] = useState(['BOS + OB', 'FVG Retest', 'Liquidity Grab', 'Trend Follow', 'Break & Retest', 'Session Open', 'News Play', 'Other'])
 
   useEffect(() => {
     applyColors(DEFAULT_LONG, DEFAULT_SHORT)
@@ -102,6 +103,17 @@ export function UserSettingsProvider({ children }) {
         if (data.continuation_enabled != null) setContinuationEnabled(data.continuation_enabled)
         if (data.continuation_window_days != null) setContinuationWindowDays(data.continuation_window_days)
       })
+    // Playbook setup types — separate query
+    supabase
+      .from('user_settings')
+      .select('playbook_setup_types')
+      .eq('user_id', user.id)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error || !data) return
+        if (Array.isArray(data.playbook_setup_types) && data.playbook_setup_types.length > 0)
+          setPlaybookSetupTypes(data.playbook_setup_types)
+      })
     // Trade checklist — separate query
     supabase
       .from('user_settings')
@@ -121,7 +133,7 @@ export function UserSettingsProvider({ children }) {
   }
 
   return (
-    <UserSettingsContext.Provider value={{ longColor, shortColor, updateColors, plan, accountSize, setAccountSize, showDollarValues, setShowDollarValues, dailyReminder, setDailyReminder, reminderTime, setReminderTime, goalMonthlyPnl, setGoalMonthlyPnl, goalWinRate, setGoalWinRate, goalTradesCount, setGoalTradesCount, goalAvgRR, setGoalAvgRR, continuationEnabled, setContinuationEnabled, continuationWindowDays, setContinuationWindowDays, propEnabled, setPropEnabled, propDailyLimit, setPropDailyLimit, propTotalLimit, setPropTotalLimit, tradeChecklist, setTradeChecklist }}>
+    <UserSettingsContext.Provider value={{ longColor, shortColor, updateColors, plan, accountSize, setAccountSize, showDollarValues, setShowDollarValues, dailyReminder, setDailyReminder, reminderTime, setReminderTime, goalMonthlyPnl, setGoalMonthlyPnl, goalWinRate, setGoalWinRate, goalTradesCount, setGoalTradesCount, goalAvgRR, setGoalAvgRR, continuationEnabled, setContinuationEnabled, continuationWindowDays, setContinuationWindowDays, propEnabled, setPropEnabled, propDailyLimit, setPropDailyLimit, propTotalLimit, setPropTotalLimit, tradeChecklist, setTradeChecklist, playbookSetupTypes, setPlaybookSetupTypes }}>
       {children}
     </UserSettingsContext.Provider>
   )

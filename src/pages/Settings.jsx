@@ -102,7 +102,7 @@ function SortableItem({ item, onDelete }) {
 export default function Settings() {
   const { user } = useAuth()
   const { t } = useLang()
-  const { updateColors, plan, accountSize: ctxAccountSize, setAccountSize: ctxSetAccountSize, showDollarValues: ctxShowDollar, setShowDollarValues: ctxSetShowDollar, dailyReminder: ctxDailyReminder, setDailyReminder: ctxSetDailyReminder, reminderTime: ctxReminderTime, setReminderTime: ctxSetReminderTime, setGoalMonthlyPnl: ctxSetGoalMonthlyPnl, setGoalWinRate: ctxSetGoalWinRate, setGoalTradesCount: ctxSetGoalTradesCount, setGoalAvgRR: ctxSetGoalAvgRR, setContinuationEnabled: ctxSetContinuationEnabled, setContinuationWindowDays: ctxSetContinuationWindowDays, setPropEnabled: ctxSetPropEnabled, setPropDailyLimit: ctxSetPropDailyLimit, setPropTotalLimit: ctxSetPropTotalLimit, tradeChecklist: ctxTradeChecklist, setTradeChecklist: ctxSetTradeChecklist } = useUserSettings()
+  const { updateColors, plan, accountSize: ctxAccountSize, setAccountSize: ctxSetAccountSize, showDollarValues: ctxShowDollar, setShowDollarValues: ctxSetShowDollar, dailyReminder: ctxDailyReminder, setDailyReminder: ctxSetDailyReminder, reminderTime: ctxReminderTime, setReminderTime: ctxSetReminderTime, setGoalMonthlyPnl: ctxSetGoalMonthlyPnl, setGoalWinRate: ctxSetGoalWinRate, setGoalTradesCount: ctxSetGoalTradesCount, setGoalAvgRR: ctxSetGoalAvgRR, setContinuationEnabled: ctxSetContinuationEnabled, setContinuationWindowDays: ctxSetContinuationWindowDays, setPropEnabled: ctxSetPropEnabled, setPropDailyLimit: ctxSetPropDailyLimit, setPropTotalLimit: ctxSetPropTotalLimit, tradeChecklist: ctxTradeChecklist, setTradeChecklist: ctxSetTradeChecklist, playbookSetupTypes: ctxPlaybookTypes, setPlaybookSetupTypes: ctxSetPlaybookTypes } = useUserSettings()
   const [accountSize, setAccountSizeLocal] = useState(ctxAccountSize || 10000)
   const [showDollarValues, setShowDollarValuesLocal] = useState(ctxShowDollar || false)
   const [dailyReminder, setDailyReminderLocal] = useState(ctxDailyReminder || false)
@@ -172,6 +172,8 @@ export default function Settings() {
   const [propTotalLimit, setPropTotalLimitLocal] = useState('10')
   const [checklistLocal, setChecklistLocal] = useState([])
   const [newChecklistItem, setNewChecklistItem] = useState('')
+  const [playbookTypesLocal, setPlaybookTypesLocal] = useState([])
+  const [newPlaybookType, setNewPlaybookType] = useState('')
 
   // Change password
   const [currentPassword, setCurrentPassword] = useState('')
@@ -340,6 +342,7 @@ export default function Settings() {
       if (data.prop_daily_loss_limit != null) setPropDailyLimitLocal(String(data.prop_daily_loss_limit))
       if (data.prop_total_loss_limit != null) setPropTotalLimitLocal(String(data.prop_total_loss_limit))
       if (Array.isArray(data.trade_checklist)) setChecklistLocal(data.trade_checklist)
+      if (Array.isArray(data.playbook_setup_types) && data.playbook_setup_types.length > 0) setPlaybookTypesLocal(data.playbook_setup_types)
     } else {
       setPairs(DEFAULT_PAIRS)
     }
@@ -373,6 +376,7 @@ export default function Settings() {
       prop_daily_loss_limit: parseFloat(propDailyLimit) || 5,
       prop_total_loss_limit: parseFloat(propTotalLimit) || 10,
       trade_checklist: checklistLocal,
+      playbook_setup_types: playbookTypesLocal.length > 0 ? playbookTypesLocal : null,
     }, { onConflict: 'user_id' })
     setSaving(false)
     if (error) {
@@ -394,6 +398,7 @@ export default function Settings() {
       ctxSetPropDailyLimit(parseFloat(propDailyLimit) || 5)
       ctxSetPropTotalLimit(parseFloat(propTotalLimit) || 10)
       ctxSetTradeChecklist(checklistLocal)
+      if (playbookTypesLocal.length > 0) ctxSetPlaybookTypes(playbookTypesLocal)
       // sync localStorage for reminder scheduler
       localStorage.setItem('reminder_enabled', dailyReminder ? '1' : '0')
       localStorage.setItem('reminder_time', reminderTime)
@@ -928,6 +933,47 @@ export default function Settings() {
                 if (!newChecklistItem.trim()) return
                 setChecklistLocal(prev => [...prev, newChecklistItem.trim()])
                 setNewChecklistItem('')
+                setIsDirty(true)
+              }}
+              style={{ padding: '8px 16px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}
+            >Add</button>
+          </div>
+        </div>
+      )}
+
+      {/* Playbook Setup Types */}
+      {activeTab === 'trading' && (
+        <div style={cardStyle}>
+          <p style={sectionTitle}>Playbook Setup Types</p>
+          <p style={sectionSub}>Categories shown in the Playbook when creating a new setup</p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '14px' }}>
+            {(playbookTypesLocal.length > 0 ? playbookTypesLocal : ctxPlaybookTypes).map((type, idx) => (
+              <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '20px', background: 'var(--bg)', border: '1px solid var(--border)' }}>
+                <span style={{ fontSize: '12px', color: 'var(--text)' }}>{type}</span>
+                <button onClick={() => { setPlaybookTypesLocal(prev => (prev.length > 0 ? prev : ctxPlaybookTypes).filter((_, i) => i !== idx)); setIsDirty(true) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#FF453A', fontSize: '14px', lineHeight: 1, padding: '0 0 0 2px' }}>×</button>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <input
+              value={newPlaybookType}
+              onChange={e => setNewPlaybookType(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && newPlaybookType.trim()) {
+                  e.preventDefault()
+                  setPlaybookTypesLocal(prev => [...(prev.length > 0 ? prev : ctxPlaybookTypes), newPlaybookType.trim()])
+                  setNewPlaybookType('')
+                  setIsDirty(true)
+                }
+              }}
+              placeholder="e.g. Reversal Play"
+              style={{ ...inputStyle, flex: 1 }}
+            />
+            <button
+              onClick={() => {
+                if (!newPlaybookType.trim()) return
+                setPlaybookTypesLocal(prev => [...(prev.length > 0 ? prev : ctxPlaybookTypes), newPlaybookType.trim()])
+                setNewPlaybookType('')
                 setIsDirty(true)
               }}
               style={{ padding: '8px 16px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}
