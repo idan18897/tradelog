@@ -374,6 +374,10 @@ export default function TradeForm() {
   const [pairSearch, setPairSearch] = useState('')
   const [showPairDrop, setShowPairDrop] = useState(false)
   const pairDropRef = useRef(null)
+  const entryHRef = useRef(null)
+  const entryMRef = useRef(null)
+  const exitHRef = useRef(null)
+  const exitMRef = useRef(null)
 
   // HTF screenshot
   const [htfFile, setHtfFile] = useState(null)
@@ -516,6 +520,20 @@ export default function TradeForm() {
       }
       if (!isEditing && !duplicateData && data.default_pair) {
         setFormData(prev => ({ ...prev, pair: data.default_pair }))
+      }
+      // Override with last-used pair/direction from localStorage
+      if (!isEditing && !duplicateData) {
+        try {
+          const lastPair = localStorage.getItem('tradeform_last_pair')
+          const lastDir = localStorage.getItem('tradeform_last_direction')
+          if (lastPair || lastDir) {
+            setFormData(prev => ({
+              ...prev,
+              ...(lastPair ? { pair: lastPair } : {}),
+              ...(lastDir ? { direction: lastDir } : {}),
+            }))
+          }
+        } catch (_) {}
       }
       if (!isEditing && data.default_outcome) {
         setFormData(prev => ({ ...prev, outcome: data.default_outcome }))
@@ -825,6 +843,8 @@ export default function TradeForm() {
         }
       }
 
+      try { localStorage.setItem('tradeform_last_pair', formData.pair) } catch(_) {}
+      try { localStorage.setItem('tradeform_last_direction', formData.direction) } catch(_) {}
       navigate('/journal')
     } catch (err) {
       setError(err.message || 'אירעה שגיאה')
@@ -985,7 +1005,7 @@ export default function TradeForm() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <form onSubmit={handleSubmit} onKeyDown={e => { if (e.key === 'Enter' && e.target.type !== 'submit') e.preventDefault() }} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         {/* Live / Missed toggle */}
         <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
           {['live', 'missed'].map(type => (
@@ -1188,17 +1208,17 @@ export default function TradeForm() {
                         <div>
                           <label style={labelStyle}>Entry Time</label>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <input type="number" min="0" max="23" value={parseInt(timeHours, 10)} onChange={e => setTimeHours(e.target.value)} style={{ ...inputStyle, width: '64px', textAlign: 'center', padding: '8px 6px' }} placeholder="HH" />
+                            <input ref={entryHRef} type="number" min="0" max="23" value={parseInt(timeHours, 10)} onChange={e => setTimeHours(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); entryMRef.current?.focus(); entryMRef.current?.select() } }} style={{ ...inputStyle, width: '64px', textAlign: 'center', padding: '8px 6px' }} placeholder="HH" />
                             <span style={{ color: 'var(--text-muted)', fontWeight: 700, fontSize: '16px', flexShrink: 0 }}>:</span>
-                            <input type="number" min="0" max="59" value={parseInt(timeMinutes, 10)} onChange={e => setTimeMinutes(e.target.value)} style={{ ...inputStyle, width: '64px', textAlign: 'center', padding: '8px 6px' }} placeholder="MM" />
+                            <input ref={entryMRef} type="number" min="0" max="59" value={parseInt(timeMinutes, 10)} onChange={e => setTimeMinutes(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); exitHRef.current?.focus(); exitHRef.current?.select() } }} style={{ ...inputStyle, width: '64px', textAlign: 'center', padding: '8px 6px' }} placeholder="MM" />
                           </div>
                         </div>
                         <div>
                           <label style={labelStyle}>Exit Time</label>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <input type="number" min="0" max="23" value={exitTimeHours !== '' ? parseInt(exitTimeHours, 10) : ''} onChange={e => setExitTimeHours(e.target.value)} style={{ ...inputStyle, width: '64px', textAlign: 'center', padding: '8px 6px' }} placeholder="HH" />
+                            <input ref={exitHRef} type="number" min="0" max="23" value={exitTimeHours !== '' ? parseInt(exitTimeHours, 10) : ''} onChange={e => setExitTimeHours(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); exitMRef.current?.focus(); exitMRef.current?.select() } }} style={{ ...inputStyle, width: '64px', textAlign: 'center', padding: '8px 6px' }} placeholder="HH" />
                             <span style={{ color: 'var(--text-muted)', fontWeight: 700, fontSize: '16px', flexShrink: 0 }}>:</span>
-                            <input type="number" min="0" max="59" value={exitTimeMinutes !== '' ? parseInt(exitTimeMinutes, 10) : ''} onChange={e => setExitTimeMinutes(e.target.value)} style={{ ...inputStyle, width: '64px', textAlign: 'center', padding: '8px 6px' }} placeholder="MM" />
+                            <input ref={exitMRef} type="number" min="0" max="59" value={exitTimeMinutes !== '' ? parseInt(exitTimeMinutes, 10) : ''} onChange={e => setExitTimeMinutes(e.target.value)} style={{ ...inputStyle, width: '64px', textAlign: 'center', padding: '8px 6px' }} placeholder="MM" />
                           </div>
                         </div>
                         <div>
