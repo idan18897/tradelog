@@ -8,16 +8,16 @@
 ───────────────────────────────────────── */
 :root {
   /* Backgrounds */
-  --bg:               #F2F2F7;
-  --bg-secondary:     #E5E5EA;
+  --bg:               #E8E8ED;
+  --bg-secondary:     #DCDCE2;
 
   /* Cards */
   --card:             #FFFFFF;
-  --card-hover:       #F9F9F9;
+  --card-hover:       #F5F5FA;
 
   /* Borders */
-  --border:           rgba(0,0,0,0.07);
-  --border-strong:    rgba(0,0,0,0.13);
+  --border:           rgba(0,0,0,0.10);
+  --border-strong:    rgba(0,0,0,0.18);
 
   /* Typography */
   --text:             #1C1C1E;
@@ -30,10 +30,10 @@
   --accent-light:     rgba(0,122,255,0.09);
   --accent-light-hover: rgba(0,122,255,0.16);
 
-  /* Shadows */
-  --shadow:           0 1px 2px rgba(0,0,0,0.04), 0 2px 8px rgba(0,0,0,0.06);
-  --shadow-md:        0 4px 16px rgba(0,0,0,0.08);
-  --shadow-lg:        0 8px 32px rgba(0,0,0,0.10);
+  /* Shadows — more depth so cards float on the background */
+  --shadow:           0 1px 3px rgba(0,0,0,0.07), 0 3px 12px rgba(0,0,0,0.08);
+  --shadow-md:        0 4px 20px rgba(0,0,0,0.11);
+  --shadow-lg:        0 8px 40px rgba(0,0,0,0.14);
 
   /* Radius */
   --radius-sm:        10px;
@@ -45,13 +45,13 @@
   --logo-color:       #1d1d1f;
   --logo-invert:      0;
 
-  /* Navigation */
-  --sidebar-bg:       #FFFFFF;
-  --sidebar-border:   rgba(0,0,0,0.07);
+  /* Navigation — slightly off-white, distinct from cards */
+  --sidebar-bg:       #F2F2F7;
+  --sidebar-border:   rgba(0,0,0,0.09);
 
   /* Inputs */
   --input-bg:         #F2F2F7;
-  --input-border:     rgba(0,0,0,0.10);
+  --input-border:     rgba(0,0,0,0.12);
   --input-focus:      #007AFF;
 
   /* Primary Button */
