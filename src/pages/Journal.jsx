@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, Component } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
@@ -1870,7 +1871,7 @@ function JournalInner() {
       </div>
 
       {/* Full Detail Modal */}
-      {fullDetailTrade && (() => {
+      {fullDetailTrade && createPortal((() => {
         const tr = fullDetailTrade
         const badge = getOutcomeBadge(tr.outcome)
         const pnl = computePnL(tr)
@@ -1884,7 +1885,7 @@ function JournalInner() {
             onClick={() => setFullDetailTrade(null)}
           >
             <div
-              style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '20px', boxShadow: '0 24px 80px rgba(0,0,0,0.5)', width: '100%', maxWidth: '640px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', animation: 'slideInRight 0.2s ease' }}
+              style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '20px', boxShadow: '0 24px 80px rgba(0,0,0,0.5)', width: '100%', maxWidth: '640px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', animation: 'fadeIn 0.2s ease' }}
               onClick={e => e.stopPropagation()}
             >
               {/* Modal Header */}
@@ -2069,7 +2070,7 @@ function JournalInner() {
             </div>
           </div>
         )
-      })()}
+      })(), document.body)}
 
       {/* Lightbox */}
       {lightbox && <Lightbox src={lightbox.src} label={lightbox.label} onClose={() => setLightbox(null)} />}
