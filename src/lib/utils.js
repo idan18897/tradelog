@@ -25,6 +25,8 @@ export function computePnL(trade) {
  * Prefers rr_potential (price-based) over pot_rr (manual).
  */
 export function computeMissedPotGain(trade) {
+  // If the missed trade resulted in SL, there's no potential gain
+  if (trade.outcome === 'SL') return 0
   const fullRR = Number(trade.rr_potential) || Number(trade.pot_rr) || 0
   const risk = Number(trade.risk_pct) || 0.5
   if (!fullRR) return 0
