@@ -62,6 +62,8 @@ export default function Dashboard() {
   const [showMissed, setShowMissed] = useState(false)
   const [customOpen, setCustomOpen] = useState(false)
   const [hourView, setHourView] = useState('winRate') // 'winRate' | 'volume'
+  const [selectedHours, setSelectedHours] = useState(new Set())
+  const toggleHour = (h) => setSelectedHours(prev => { const n = new Set(prev); n.has(h) ? n.delete(h) : n.add(h); return n })
   const [dashTab, setDashTab] = useState('overview') // 'overview' | 'confirmations'
   const [showReportModal, setShowReportModal] = useState(false)
   const [reportType, setReportType] = useState('weekly')
@@ -3330,28 +3332,31 @@ export default function Dashboard() {
                 cursor={{ fill: 'rgba(128,128,128,0.06)' }}
               />
               {hourView === 'winRate' ? (
-                <Bar dataKey="winRate" radius={[4, 4, 0, 0]} maxBarSize={40}>
+                <Bar dataKey="winRate" radius={[4, 4, 0, 0]} maxBarSize={40} onClick={(d) => toggleHour(d.hour)} style={{ cursor: 'pointer' }}>
                   {perfByHour.map((h, i) => (
                     <Cell
                       key={i}
-                      fill={h.winRate === null ? '#6b7280'
+                      fill={selectedHours.has(h.hour) ? '#a78bfa'
+                        : h.winRate === null ? '#6b7280'
                         : h.winRate >= 60 ? '#0A84FF'
                         : h.winRate >= 40 ? '#f59e0b'
                         : '#f87171'}
-                      opacity={0.85}
+                      opacity={selectedHours.has(h.hour) ? 1 : 0.85}
+                      stroke={selectedHours.has(h.hour) ? '#7c3aed' : 'none'}
+                      strokeWidth={2}
                     />
                   ))}
                 </Bar>
               ) : hourView === 'volume' ? (
-                <Bar dataKey="total" radius={[4, 4, 0, 0]} maxBarSize={40}>
+                <Bar dataKey="total" radius={[4, 4, 0, 0]} maxBarSize={40} onClick={(d) => toggleHour(d.hour)} style={{ cursor: 'pointer' }}>
                   {perfByHour.map((h, i) => (
-                    <Cell key={i} fill="#60a5fa" opacity={0.7 + (h.total / Math.max(...perfByHour.map(x => x.total))) * 0.3} />
+                    <Cell key={i} fill={selectedHours.has(h.hour) ? '#a78bfa' : '#60a5fa'} opacity={selectedHours.has(h.hour) ? 1 : 0.7 + (h.total / Math.max(...perfByHour.map(x => x.total))) * 0.3} stroke={selectedHours.has(h.hour) ? '#7c3aed' : 'none'} strokeWidth={2} />
                   ))}
                 </Bar>
               ) : (
-                <Bar dataKey="total" radius={[4, 4, 0, 0]} maxBarSize={40}>
+                <Bar dataKey="total" radius={[4, 4, 0, 0]} maxBarSize={40} onClick={(d) => toggleHour(d.hour)} style={{ cursor: 'pointer' }}>
                   {exitByHour.map((h, i) => (
-                    <Cell key={i} fill="#a78bfa" opacity={0.7 + (h.total / Math.max(...exitByHour.map(x => x.total), 1)) * 0.3} />
+                    <Cell key={i} fill={selectedHours.has(h.hour) ? '#60a5fa' : '#a78bfa'} opacity={selectedHours.has(h.hour) ? 1 : 0.7 + (h.total / Math.max(...exitByHour.map(x => x.total), 1)) * 0.3} stroke={selectedHours.has(h.hour) ? '#2563eb' : 'none'} strokeWidth={2} />
                   ))}
                 </Bar>
               )}
@@ -3367,7 +3372,64 @@ export default function Dashboard() {
               <div style={{ width: '24px', height: '3px', background: '#f59e0b', borderRadius: '2px' }} />
               <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>New York 15:00–19:00</span>
             </div>
+            <div style={{ marginLeft: 'auto', fontSize: '11px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ width: '10px', height: '10px', display: 'inline-block', background: '#a78bfa', borderRadius: '2px', border: '2px solid #7c3aed' }} />
+              Click bars to select hours
+            </div>
           </div>
+          {/* ── Selected Hours Detail Panel ── */}
+          {selectedHours.size > 0 && (() => {
+            const selArr = Array.from(selectedHours).sort((a, b) => a - b)
+            const liveInHours = allLiveTrades.filter(tr => {
+              const h = parseInt((tr.time || '').split(':')[0], 10)
+              return !isNaN(h) && selectedHours.has(h)
+            })
+            const missedInHours = allMissedTrades.filter(tr => {
+              const h = parseInt((tr.time || '').split(':')[0], 10)
+              return !isNaN(h) && selectedHours.has(h)
+            })
+            const closed = liveInHours.filter(t => ['TP', 'Partial TP', 'SL', 'BE'].includes(t.outcome))
+            const tp = closed.filter(t => t.outcome === 'TP' || t.outcome === 'Partial TP').length
+            const sl = closed.filter(t => t.outcome === 'SL').length
+            const be = closed.filter(t => t.outcome === 'BE').length
+            const wr = closed.length ? Math.round(tp / closed.length * 100) : null
+            const pnl = closed.reduce((s, t) => s + computePnL(t), 0)
+            const pnlStr = (pnl >= 0 ? '+' : '') + pnl.toFixed(2) + '%'
+            return (
+              <div style={{ marginTop: '16px', padding: '16px', background: 'var(--bg-secondary)', borderRadius: '12px', border: '1px solid rgba(124,58,237,0.25)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)' }}>Hours selected:</span>
+                    {selArr.map(h => (
+                      <button key={h} onClick={() => toggleHour(h)} style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '20px', background: '#7c3aed', color: '#fff', border: 'none', cursor: 'pointer' }}>
+                        {String(h).padStart(2, '0')}:00 ✕
+                      </button>
+                    ))}
+                  </div>
+                  <button onClick={() => setSelectedHours(new Set())} style={{ fontSize: '11px', color: 'var(--accent)', background: 'none', border: '1px solid var(--border)', borderRadius: '8px', padding: '3px 10px', cursor: 'pointer' }}>Clear all</button>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '10px' }}>
+                  {[
+                    { label: 'Live Trades', value: liveInHours.length, color: 'var(--text)' },
+                    { label: 'Missed', value: missedInHours.length, color: '#FF9F0A' },
+                    { label: 'TP / SL / BE', value: `${tp} / ${sl} / ${be}`, color: 'var(--text)' },
+                    { label: 'Win Rate', value: wr !== null ? `${wr}%` : '--', color: wr !== null ? (wr >= 50 ? '#30D158' : '#FF453A') : 'var(--text-muted)' },
+                    { label: 'Total P&L', value: pnlStr, color: pnl >= 0 ? '#30D158' : '#FF453A' },
+                  ].map(stat => (
+                    <div key={stat.label} style={{ background: 'var(--card)', borderRadius: '10px', padding: '10px 12px' }}>
+                      <p style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{stat.label}</p>
+                      <p style={{ fontSize: '17px', fontWeight: 700, color: stat.color }}>{stat.value}</p>
+                    </div>
+                  ))}
+                </div>
+                {wr !== null && (
+                  <div style={{ marginTop: '12px', height: '4px', background: 'var(--border)', borderRadius: '2px', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${wr}%`, background: wr >= 50 ? '#30D158' : '#FF453A', borderRadius: '2px', transition: 'width 0.4s ease' }} />
+                  </div>
+                )}
+              </div>
+            )
+          })()}
         </div>
       )}
 
