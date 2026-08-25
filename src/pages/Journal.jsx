@@ -233,8 +233,13 @@ const CAL_DAY_HEADERS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 
 // secondaryTrades = missed trades shown in amber overlay (optional)
-function TradeCalendar({ trades, secondaryTrades, calMonth, onMonthChange, filterDay, onDayClick }) {
+function TradeCalendar({ trades, secondaryTrades, calMonth, onMonthChange, filterDay, onDayClick, accountSize, showDollarValues }) {
   const isMobile = useIsMobile()
+  function pnlDollar(pct) {
+    if (!showDollarValues || !accountSize) return ''
+    const val = (pct / 100) * accountSize
+    return ` ($${val >= 0 ? '+' : ''}${Math.abs(val).toFixed(0)})`
+  }
   const [year, month] = calMonth.split('-').map(Number)
   const firstDay = new Date(year, month - 1, 1)
   const daysInMonth = new Date(year, month, 0).getDate()
@@ -446,8 +451,15 @@ function TradeCalendar({ trades, secondaryTrades, calMonth, onMonthChange, filte
                       </span>
                     </div>
                     {hasTrades && (
-                      <div style={{ marginTop: '8px', fontSize: '13px', fontWeight: 700, color: pnl >= 0 ? '#30D158' : '#FF453A' }}>
-                        {pnl >= 0 ? '+' : ''}{pnl.toFixed(2)}%
+                      <div style={{ marginTop: '8px' }}>
+                        <div style={{ fontSize: '13px', fontWeight: 700, color: pnl >= 0 ? '#30D158' : '#FF453A' }}>
+                          {pnl >= 0 ? '+' : ''}{pnl.toFixed(2)}%
+                        </div>
+                        {showDollarValues && accountSize && (
+                          <div style={{ fontSize: '10px', fontWeight: 600, color: pnl >= 0 ? '#30D158' : '#FF453A', opacity: 0.75 }}>
+                            {pnlDollar(pnl)}
+                          </div>
+                        )}
                       </div>
                     )}
                     {!hasTrades && hasMissed && missed.potPnL > 0 && (
@@ -485,9 +497,16 @@ function TradeCalendar({ trades, secondaryTrades, calMonth, onMonthChange, filte
                   <>
                     <span style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Weekly</span>
                     {weekHasTrades && (
-                      <span style={{ fontSize: '13px', fontWeight: 700, color: weekPnL >= 0 ? '#30D158' : '#f87171', textAlign: 'center' }}>
-                        {weekPnL >= 0 ? '+' : ''}{weekPnL.toFixed(2)}%
-                      </span>
+                      <>
+                        <span style={{ fontSize: '13px', fontWeight: 700, color: weekPnL >= 0 ? '#30D158' : '#f87171', textAlign: 'center' }}>
+                          {weekPnL >= 0 ? '+' : ''}{weekPnL.toFixed(2)}%
+                        </span>
+                        {showDollarValues && accountSize && (
+                          <span style={{ fontSize: '10px', fontWeight: 600, color: weekPnL >= 0 ? '#30D158' : '#f87171', opacity: 0.75, textAlign: 'center' }}>
+                            {pnlDollar(weekPnL)}
+                          </span>
+                        )}
+                      </>
                     )}
                     {weekMissedPnL > 0 && (
                       <span style={{ fontSize: '11px', fontWeight: 700, color: '#FF9F0A', textAlign: 'center' }}>
@@ -537,6 +556,11 @@ function JournalInner() {
   const { accountSize, showDollarValues } = useUserSettings()
   const isMobile = useIsMobile()
   const navigate = useNavigate()
+  function $d(pct) {
+    if (!showDollarValues || !accountSize) return ''
+    const val = (pct / 100) * accountSize
+    return ` ($${val >= 0 ? '+' : '-'}${Math.abs(val).toFixed(0)})`
+  }
   const [trades, setTrades] = useState([])
   const [pairsList, setPairsList] = useState(DEFAULT_PAIRS)
   const [loading, setLoading] = useState(true)
@@ -929,6 +953,7 @@ function JournalInner() {
                 <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>Total P&L</p>
                 <p style={{ fontSize: '20px', fontWeight: 700, color: liveTotalPnL >= 0 ? '#30D158' : '#f87171' }}>
                   {liveTotalPnL >= 0 ? '+' : ''}{liveTotalPnL.toFixed(1)}%
+                  {showDollarValues && accountSize && <span style={{ fontSize: '13px', fontWeight: 500, opacity: 0.75 }}>{$d(liveTotalPnL)}</span>}
                 </p>
               </div>
               <div>
@@ -1085,6 +1110,9 @@ function JournalInner() {
             onMonthChange={handleCalMonthChange}
             filterDay={filterDay}
             onDayClick={handleDayClick}
+          
+            accountSize={accountSize}
+            showDollarValues={showDollarValues}
           />
         </div>
       )}
@@ -1161,6 +1189,9 @@ function JournalInner() {
             onMonthChange={handleCalMonthChange}
             filterDay={filterDay}
             onDayClick={handleDayClick}
+          
+            accountSize={accountSize}
+            showDollarValues={showDollarValues}
           />
         </div>
       )}
@@ -1175,6 +1206,9 @@ function JournalInner() {
             onMonthChange={handleCalMonthChange}
             filterDay={filterDay}
             onDayClick={handleDayClick}
+          
+            accountSize={accountSize}
+            showDollarValues={showDollarValues}
           />
         </div>
       )}

@@ -829,6 +829,29 @@ export default function Dashboard() {
   // Sort by score descending, cap at 6
   const insights = rawInsights.sort((a, b) => b.score - a.score).slice(0, 6)
 
+
+  function exportCSV() {
+    const rows = [
+      ['Date','Day','Time','Exit Time','Pair','Direction','Entry','SL','TP','SL Pips','Pot RR','Risk%','Outcome','P&L%','Rating','Notes','Trade Type','Mood','Rule Violated'],
+      ...[...allLiveTrades.filter(inDateRange), ...(showMissed ? allMissedTrades.filter(inDateRange) : [])].map(tr => [
+        tr.date, tr.day || '', tr.time || '', tr.exit_time || '',
+        tr.pair, tr.direction, tr.entry || '', tr.sl || '', tr.tp || '',
+        tr.sl_pips || '', tr.rr_potential || tr.pot_rr || '', tr.risk_pct || '',
+        tr.outcome, computePnL(tr).toFixed(2),
+        tr.rating || '', (tr.notes || '').replace(/,/g, ';').replace(/\n/g, ' '),
+        tr.trade_type || 'live', tr.mood || '', tr.rule_violated ? 'Yes' : 'No',
+      ])
+    ]
+    const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `tradelog_${dateFilter.type === 'month' ? navMonthStr : dateFilter.type === 'year' ? navYearLabel : 'export'}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   // Dollar P&L helper
   function dollarStr(pct) {
     if (!showDollarValues || !accountSize) return ''
@@ -1525,6 +1548,23 @@ export default function Dashboard() {
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
           </svg>
           Export PDF
+        </button>
+        <button
+          onClick={exportCSV}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '6px',
+            padding: '7px 16px', borderRadius: '20px', fontSize: '13px', fontWeight: 600,
+            cursor: 'pointer', border: '1px solid var(--border)',
+            background: 'var(--bg)', color: 'var(--text-muted)', transition: 'all 0.15s', flexShrink: 0,
+          }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = '#30D158'; e.currentTarget.style.color = '#30D158' }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-muted)' }}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+          </svg>
+          Export CSV
         </button>
       </div>
 

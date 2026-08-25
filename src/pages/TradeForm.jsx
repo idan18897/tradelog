@@ -318,7 +318,7 @@ export default function TradeForm() {
   const { t } = useLang()
   const isMobile = useIsMobile()
   const navigate = useNavigate()
-  const { plan, continuationEnabled, continuationWindowDays, longColor, shortColor } = useUserSettings()
+  const { plan, continuationEnabled, continuationWindowDays, longColor, shortColor, accountSize } = useUserSettings()
   const { theme } = useTheme()
   // Ensure direction colors are visible in light mode (darken if too light)
   function visibleColor(hex) {
@@ -792,6 +792,37 @@ export default function TradeForm() {
       } else {
         const { error } = await supabase.from('trades').insert(payload)
         if (error) throw error
+        // Check for streak milestone on new live closed trade
+        if (payload.trade_type !== 'missed' && ['TP','Partial TP','SL'].includes(payload.outcome)) {
+          try {
+            const { data: recent } = await supabase
+              .from('trades')
+              .select('outcome,date,time')
+              .eq('user_id', user.id)
+              .eq('trade_type', 'live')
+              .in('outcome', ['TP','Partial TP','SL','BE'])
+              .order('date', { ascending: false })
+              .order('time', { ascending: false })
+              .limit(15)
+            if (recent?.length) {
+              let streak = 0, streakType = null
+              for (const t of recent) {
+                const isW = t.outcome === 'TP' || t.outcome === 'Partial TP'
+                const type = isW ? 'win' : 'loss'
+                if (streakType === null) { streakType = type; streak = 1 }
+                else if (type === streakType) streak++
+                else break
+              }
+              const milestones = streakType === 'win' ? [3,5,10] : [3,5]
+              if (milestones.includes(streak)) {
+                const msg = streakType === 'win'
+                  ? `🔥 ${streak}-trade winning streak! Keep it disciplined.`
+                  : `⚠️ ${streak} losses in a row — consider reducing size or sitting out.`
+                localStorage.setItem('streak_toast', JSON.stringify({ msg, ts: Date.now() }))
+              }
+            }
+          } catch(_) {}
+        }
       }
 
       navigate('/journal')
@@ -1293,7 +1324,15 @@ export default function TradeForm() {
                           </label>
                           <input type="number" step="any" value={formData.sl_pips} onChange={e => handleField('sl_pips', e.target.value)} style={{ ...inputStyle, borderColor: formData.sl_pips ? 'var(--accent)' : 'var(--input-border)' }} placeholder={instrumentType === 'forex' ? 'Auto' : '0'} />
                         </div>
-                        <div><label style={labelStyle}>{t.risk}</label><input type="number" step="any" value={formData.risk_pct} onChange={e => handleField('risk_pct', e.target.value)} style={inputStyle} placeholder="0.5" /></div>
+                        <div>
+                          <label style={labelStyle}>{t.risk}</label>
+                          <input type="number" step="any" value={formData.risk_pct} onChange={e => handleField('risk_pct', e.target.value)} style={inputStyle} placeholder="0.5" />
+                          {accountSize && formData.risk_pct && (
+                            <p style={{ fontSize: '11px', color: 'var(--accent)', marginTop: '4px', fontWeight: 500 }}>
+                              = ${((parseFloat(formData.risk_pct) || 0) / 100 * accountSize).toFixed(0)} at risk
+                            </p>
+                          )}
+                        </div>
                         {instrumentType === 'stocks' && (
                           <div><label style={labelStyle}>Shares</label><input type="number" step="1" min="1" value={formData.shares} onChange={e => handleField('shares', e.target.value)} style={inputStyle} placeholder="100" /></div>
                         )}

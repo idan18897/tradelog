@@ -12,6 +12,7 @@ import TradeForm from './pages/TradeForm'
 import Settings from './pages/Settings'
 import Landing from './pages/Landing'
 import Review from './pages/Review'
+import Calculator from './pages/Calculator'
 import WelcomeModal from './components/WelcomeModal'
 import OnboardingModal from './components/OnboardingModal'
 import { supabase } from './lib/supabase'
@@ -110,6 +111,7 @@ function AppRoutes() {
           <Route path="edit/:id" element={<TradeForm />} />
           <Route path="settings" element={<Settings />} />
           <Route path="review" element={<Review />} />
+          <Route path="calc" element={<Calculator />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

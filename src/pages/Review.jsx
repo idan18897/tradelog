@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useUserSettings } from '../context/UserSettingsContext'
 import { useAuth } from '../context/AuthContext'
 import { useIsMobile } from '../hooks/useIsMobile'
 import { computePnL } from '../lib/utils'
@@ -48,6 +49,12 @@ const OUTCOME_COLORS = {
 export default function Review() {
   const { user } = useAuth()
   const isMobile = useIsMobile()
+  const { accountSize, showDollarValues } = useUserSettings()
+  function $d(pct) {
+    if (!showDollarValues || !accountSize) return null
+    const val = (pct / 100) * accountSize
+    return `($${val >= 0 ? '+' : '-'}${Math.abs(val).toFixed(0)})`
+  }
 
   // week offset from current week (0 = this week, -1 = last week, …)
   const [weekOffset, setWeekOffset] = useState(0)
@@ -103,6 +110,34 @@ export default function Review() {
   const weekPnL = parseFloat(weekTrades.reduce((s, t) => s + computePnL(t), 0).toFixed(2))
   const weekWR = weekClosed.length ? Math.round(weekTP / weekClosed.length * 100) : null
   const weekViolations = weekTrades.filter(t => t.rule_violated).length
+  // Best confirmation this week (min 2 trades with that conf)
+  const weekClosed2 = weekTrades.filter(t => ['TP','Partial TP','SL','BE'].includes(t.outcome))
+  const confWR = {}
+  weekClosed2.forEach(t => {
+    (t.confirmations || []).forEach(c => {
+      if (!confWR[c]) confWR[c] = { wins: 0, total: 0 }
+      confWR[c].total++
+      if (t.outcome === 'TP' || t.outcome === 'Partial TP') confWR[c].wins++
+    })
+  })
+  const bestConf = Object.entries(confWR)
+    .filter(([, v]) => v.total >= 2)
+    .map(([c, v]) => ({ conf: c, wr: Math.round(v.wins / v.total * 100), n: v.total }))
+    .sort((a, b) => b.wr - a.wr)[0] || null
+
+  // Best pair this week
+  const pairWR = {}
+  weekClosed2.forEach(t => {
+    const p = t.pair || 'Unknown'
+    if (!pairWR[p]) pairWR[p] = { wins: 0, total: 0 }
+    pairWR[p].total++
+    if (t.outcome === 'TP' || t.outcome === 'Partial TP') pairWR[p].wins++
+  })
+  const bestPair = Object.entries(pairWR)
+    .filter(([, v]) => v.total >= 2)
+    .map(([p, v]) => ({ pair: p, wr: Math.round(v.wins / v.total * 100), n: v.total }))
+    .sort((a, b) => b.wr - a.wr)[0] || null
+
   const weekScore = (() => {
     if (!weekClosed.length) return null
     const wrScore = weekWR !== null ? Math.min(40, Math.round(weekWR / 100 * 40)) : 0
@@ -215,16 +250,37 @@ export default function Review() {
             {[
               { label: 'Trades', value: weekTrades.length, color: 'var(--text)' },
               { label: 'Win Rate', value: weekWR !== null ? `${weekWR}%` : '--', color: weekWR !== null ? (weekWR >= 50 ? '#30D158' : '#FF453A') : 'var(--text-muted)' },
-              { label: 'P&L', value: `${weekPnL >= 0 ? '+' : ''}${weekPnL.toFixed(2)}%`, color: weekPnL >= 0 ? '#30D158' : '#FF453A' },
+              { label: 'P&L', value: `${weekPnL >= 0 ? '+' : ''}${weekPnL.toFixed(2)}%`, sub: $d(weekPnL), color: weekPnL >= 0 ? '#30D158' : '#FF453A' },
               { label: 'Violations', value: weekViolations === 0 ? '✅ None' : weekViolations, color: weekViolations === 0 ? '#30D158' : '#FF453A' },
             ].map(s => (
               <div key={s.label} style={{ textAlign: 'center' }}>
                 <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '3px' }}>{s.label}</p>
                 <p style={{ fontSize: '16px', fontWeight: 700, color: s.color }}>{s.value}</p>
+                {s.sub && <p style={{ fontSize: '10px', color: s.color, opacity: 0.7, fontWeight: 600 }}>{s.sub}</p>}
               </div>
             ))}
           </div>
         </div>
+
+        {/* Best setup insight */}
+        {(bestConf || bestPair) && (
+          <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid var(--border)', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+            {bestConf && (
+              <div style={{ background: 'var(--bg-secondary)', borderRadius: '10px', padding: '10px 14px', flex: 1, minWidth: '140px' }}>
+                <p style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '3px' }}>🏆 Best Confirmation</p>
+                <p style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent)' }}>{bestConf.conf}</p>
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{bestConf.wr}% WR · {bestConf.n} trades</p>
+              </div>
+            )}
+            {bestPair && (
+              <div style={{ background: 'var(--bg-secondary)', borderRadius: '10px', padding: '10px 14px', flex: 1, minWidth: '140px' }}>
+                <p style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '3px' }}>📈 Best Pair</p>
+                <p style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent)' }}>{bestPair.pair}</p>
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{bestPair.wr}% WR · {bestPair.n} trades</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Trade list */}
@@ -271,6 +327,7 @@ export default function Review() {
                     <p style={{ fontSize: '16px', fontWeight: 700, color: pnl >= 0 ? '#30D158' : '#FF453A' }}>
                       {pnl >= 0 ? '+' : ''}{pnl.toFixed(2)}%
                     </p>
+                    {$d(pnl) && <p style={{ fontSize: '11px', fontWeight: 600, color: pnl >= 0 ? '#30D158' : '#FF453A', opacity: 0.75 }}>{$d(pnl)}</p>}
                     {tr.rr_potential ? (
                       <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>1:{tr.rr_potential} R:R</p>
                     ) : null}
