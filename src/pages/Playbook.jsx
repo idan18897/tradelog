@@ -65,7 +65,7 @@ function SetupModal({ setup, onSave, onClose }) {
   }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 2000, overflowY: 'auto', padding: '16px' }} onClick={onClose}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 2000, overflowY: 'auto', padding: '16px', paddingTop: '72px' }} onClick={onClose}>
       <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '16px', padding: '20px', width: '100%', maxWidth: '520px', margin: '0 auto', boxShadow: '0 20px 60px rgba(0,0,0,0.5)', position: 'relative' }} onClick={e => e.stopPropagation()}>
         <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text)', marginBottom: '20px' }}>{setup ? 'Edit Setup' : 'New Playbook Setup'}</h3>
 
