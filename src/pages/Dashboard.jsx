@@ -3893,8 +3893,7 @@ export default function Dashboard() {
         {aiError && <p style={{ fontSize: '12px', color: '#FF453A', marginTop: '12px' }}>{aiError}</p>}
         {aiInsights && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {aiInsights.split(/
-(?=\d+\.)/).filter(s => s.trim()).map((line, i) => (
+            {aiInsights.split(/\n(?=\d+\.)/).filter(s => s.trim()).map((line, i) => (
               <div key={i} style={{ padding: '14px 16px', borderRadius: '12px', background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
                 <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.65, margin: 0 }}
                   dangerouslySetInnerHTML={{ __html: line.trim()

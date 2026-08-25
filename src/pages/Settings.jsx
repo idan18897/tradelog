@@ -902,7 +902,7 @@ export default function Settings() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '14px' }}>
             {checklistLocal.map((item, idx) => (
               <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--bg)', borderRadius: '8px', padding: '8px 12px' }}>
-                <span style={{ fontSize: '13px', color: 'var(--text-muted)', fontSize: '16px' }}>☐</span>
+                <span style={{ fontSize: '16px', color: 'var(--text-muted)' }}>☐</span>
                 <span style={{ flex: 1, fontSize: '13px', color: 'var(--text)' }}>{item}</span>
                 <button onClick={() => { setChecklistLocal(prev => prev.filter((_, i) => i !== idx)); setIsDirty(true) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#FF453A', fontSize: '18px', lineHeight: 1 }}>×</button>
               </div>
