@@ -157,7 +157,9 @@ export default function Review() {
       <div style={{ ...card, padding: '14px 18px', marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
         <button
           onClick={() => setWeekOffset(o => o - 1)}
-          style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '6px 14px', cursor: 'pointer', color: 'var(--text)', fontSize: '14px' }}
+          style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '6px 14px', cursor: 'pointer', color: 'var(--text)', fontSize: '14px', transition: 'background 0.15s' }}
+          onMouseEnter={e => e.currentTarget.style.background = 'var(--card-hover)'}
+          onMouseLeave={e => e.currentTarget.style.background = 'var(--bg-secondary)'}
         >←</button>
 
         <div style={{ textAlign: 'center' }}>
@@ -209,7 +211,7 @@ export default function Review() {
           </div>
 
           {/* Stats */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', flex: 1, minWidth: '200px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '12px', flex: 1, minWidth: '200px' }}>
             {[
               { label: 'Trades', value: weekTrades.length, color: 'var(--text)' },
               { label: 'Win Rate', value: weekWR !== null ? `${weekWR}%` : '--', color: weekWR !== null ? (weekWR >= 50 ? '#30D158' : '#FF453A') : 'var(--text-muted)' },
@@ -325,7 +327,7 @@ export default function Review() {
           Reflect on the week as a whole — what patterns do you see?
         </p>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <div key={summaryKey} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {[
             { key: 'learned', label: '💡 Key lessons this week', placeholder: 'What are the 1–3 most important things you learned?' },
             { key: 'improve', label: '🎯 What to improve next week', placeholder: 'Specific rules or habits to focus on…' },
