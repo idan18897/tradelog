@@ -102,7 +102,7 @@ function SortableItem({ item, onDelete }) {
 export default function Settings() {
   const { user } = useAuth()
   const { t } = useLang()
-  const { updateColors, plan, accountSize: ctxAccountSize, setAccountSize: ctxSetAccountSize, showDollarValues: ctxShowDollar, setShowDollarValues: ctxSetShowDollar, dailyReminder: ctxDailyReminder, setDailyReminder: ctxSetDailyReminder, reminderTime: ctxReminderTime, setReminderTime: ctxSetReminderTime, setGoalMonthlyPnl: ctxSetGoalMonthlyPnl, setGoalWinRate: ctxSetGoalWinRate, setGoalTradesCount: ctxSetGoalTradesCount, setGoalAvgRR: ctxSetGoalAvgRR, setContinuationEnabled: ctxSetContinuationEnabled, setContinuationWindowDays: ctxSetContinuationWindowDays } = useUserSettings()
+  const { updateColors, plan, accountSize: ctxAccountSize, setAccountSize: ctxSetAccountSize, showDollarValues: ctxShowDollar, setShowDollarValues: ctxSetShowDollar, dailyReminder: ctxDailyReminder, setDailyReminder: ctxSetDailyReminder, reminderTime: ctxReminderTime, setReminderTime: ctxSetReminderTime, setGoalMonthlyPnl: ctxSetGoalMonthlyPnl, setGoalWinRate: ctxSetGoalWinRate, setGoalTradesCount: ctxSetGoalTradesCount, setGoalAvgRR: ctxSetGoalAvgRR, setContinuationEnabled: ctxSetContinuationEnabled, setContinuationWindowDays: ctxSetContinuationWindowDays, setPropEnabled: ctxSetPropEnabled, setPropDailyLimit: ctxSetPropDailyLimit, setPropTotalLimit: ctxSetPropTotalLimit } = useUserSettings()
   const [accountSize, setAccountSizeLocal] = useState(ctxAccountSize || 10000)
   const [showDollarValues, setShowDollarValuesLocal] = useState(ctxShowDollar || false)
   const [dailyReminder, setDailyReminderLocal] = useState(ctxDailyReminder || false)
@@ -167,6 +167,9 @@ export default function Settings() {
   // Continuation trades
   const [continuationEnabled, setContinuationEnabledLocal] = useState(false)
   const [continuationWindowDays, setContinuationWindowDaysLocal] = useState(1)
+  const [propEnabled, setPropEnabledLocal] = useState(false)
+  const [propDailyLimit, setPropDailyLimitLocal] = useState('5')
+  const [propTotalLimit, setPropTotalLimitLocal] = useState('10')
 
   // Change password
   const [currentPassword, setCurrentPassword] = useState('')
@@ -331,6 +334,9 @@ export default function Settings() {
       if (data.goal_avg_rr != null) setGoalAvgRRLocal(String(data.goal_avg_rr))
       if (data.continuation_enabled != null) setContinuationEnabledLocal(data.continuation_enabled)
       if (data.continuation_window_days != null) setContinuationWindowDaysLocal(data.continuation_window_days)
+      if (data.prop_enabled != null) setPropEnabledLocal(data.prop_enabled)
+      if (data.prop_daily_loss_limit != null) setPropDailyLimitLocal(String(data.prop_daily_loss_limit))
+      if (data.prop_total_loss_limit != null) setPropTotalLimitLocal(String(data.prop_total_loss_limit))
     } else {
       setPairs(DEFAULT_PAIRS)
     }
@@ -360,6 +366,9 @@ export default function Settings() {
       goal_avg_rr: goalAvgRR !== '' ? parseFloat(goalAvgRR) : null,
       continuation_enabled: continuationEnabled,
       continuation_window_days: parseInt(continuationWindowDays) || 1,
+      prop_enabled: propEnabled,
+      prop_daily_loss_limit: parseFloat(propDailyLimit) || 5,
+      prop_total_loss_limit: parseFloat(propTotalLimit) || 10,
     }, { onConflict: 'user_id' })
     setSaving(false)
     if (error) {
@@ -377,6 +386,9 @@ export default function Settings() {
       ctxSetGoalAvgRR(goalAvgRR !== '' ? parseFloat(goalAvgRR) : null)
       ctxSetContinuationEnabled(continuationEnabled)
       ctxSetContinuationWindowDays(parseInt(continuationWindowDays) || 1)
+      ctxSetPropEnabled(propEnabled)
+      ctxSetPropDailyLimit(parseFloat(propDailyLimit) || 5)
+      ctxSetPropTotalLimit(parseFloat(propTotalLimit) || 10)
       // sync localStorage for reminder scheduler
       localStorage.setItem('reminder_enabled', dailyReminder ? '1' : '0')
       localStorage.setItem('reminder_time', reminderTime)
@@ -1164,6 +1176,49 @@ export default function Settings() {
           ))}
         </div>
       </div>
+
+      {/* ── Prop Firm Rules ── */}
+      <div style={cardStyle}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: propEnabled ? '20px' : 0 }}>
+          <div>
+            <p style={sectionTitle}>Prop Firm Rules</p>
+            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>Track daily &amp; total loss limits, see how close you are to a violation</p>
+          </div>
+          <button type="button"
+            onClick={() => { setPropEnabledLocal(v => !v); setIsDirty(true) }}
+            style={{ width: '44px', height: '24px', borderRadius: '12px', border: 'none', flexShrink: 0, marginTop: '2px',
+              background: propEnabled ? 'var(--accent)' : 'var(--border-strong)', cursor: 'pointer', position: 'relative', transition: 'background 0.2s' }}
+          >
+            <span style={{ position: 'absolute', top: '4px', left: propEnabled ? '23px' : '3px', width: '16px', height: '16px',
+              borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
+          </button>
+        </div>
+        {propEnabled && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+            <div>
+              <p style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text)', marginBottom: '6px' }}>Daily Loss Limit</p>
+              <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>Max % you can lose in a single day</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <input type="number" min="0.1" max="20" step="0.5" value={propDailyLimit}
+                  onChange={e => { setPropDailyLimitLocal(e.target.value); setIsDirty(true) }}
+                  style={{ ...inputStyle, width: '80px' }} placeholder="5" />
+                <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>%</span>
+              </div>
+            </div>
+            <div>
+              <p style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text)', marginBottom: '6px' }}>Total Loss Limit</p>
+              <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>Max % drawdown before account is failed</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <input type="number" min="0.1" max="50" step="0.5" value={propTotalLimit}
+                  onChange={e => { setPropTotalLimitLocal(e.target.value); setIsDirty(true) }}
+                  style={{ ...inputStyle, width: '80px' }} placeholder="10" />
+                <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>%</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
 
       </>)}
 

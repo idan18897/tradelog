@@ -52,7 +52,7 @@ const CustomTooltip = ({ active, payload, showDollarValues, accountSize }) => {
 export default function Dashboard() {
   const { user } = useAuth()
   const { t } = useLang()
-  const { accountSize, showDollarValues, goalMonthlyPnl, goalWinRate, goalTradesCount, goalAvgRR } = useUserSettings()
+  const { accountSize, showDollarValues, goalMonthlyPnl, goalWinRate, goalTradesCount, goalAvgRR, propEnabled, propDailyLimit, propTotalLimit } = useUserSettings()
   const isMobile = useIsMobile()
   const [trades, setTrades] = useState([])
   const [loading, setLoading] = useState(true)
@@ -82,6 +82,13 @@ export default function Dashboard() {
   const [claudeQuestion, setClaudeQuestion] = useState('')
   const [claudeLoading, setClaudeLoading] = useState(false)
   const [claudeHistory, setClaudeHistory] = useState([])
+  const [nowMs, setNowMs] = useState(Date.now())
+
+  // Tick every second for trade timers
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [])
   const claudeBottomRef = useRef(null)
   const customRef = useRef(null)
 
@@ -830,6 +837,85 @@ export default function Dashboard() {
   const insights = rawInsights.sort((a, b) => b.score - a.score).slice(0, 6)
 
 
+  function shareStatsCard() {
+    const W = 640, H = 380
+    const canvas = document.createElement('canvas')
+    canvas.width = W * 2; canvas.height = H * 2
+    const ctx = canvas.getContext('2d')
+    ctx.scale(2, 2)
+
+    // Background
+    ctx.fillStyle = '#111113'
+    ctx.roundRect(0, 0, W, H, 24)
+    ctx.fill()
+
+    // Top accent bar
+    const grad = ctx.createLinearGradient(0, 0, W, 0)
+    grad.addColorStop(0, '#007AFF'); grad.addColorStop(1, '#0A84FF')
+    ctx.fillStyle = grad
+    ctx.fillRect(0, 0, W, 4)
+
+    // App name
+    ctx.font = 'bold 13px -apple-system, Inter, sans-serif'
+    ctx.fillStyle = '#636366'
+    ctx.fillText('TradingLog', 28, 32)
+
+    // Period label
+    const periodLbl = dateFilter.type === 'all' ? 'All Time' : dateFilter.type === 'month' ? navMonthLabel : dateFilter.type === 'year' ? String(new Date().getFullYear() - navOffset) : 'Custom Period'
+    ctx.font = 'bold 22px -apple-system, Inter, sans-serif'
+    ctx.fillStyle = '#FFFFFF'
+    ctx.fillText(periodLbl, 28, 72)
+
+    // Stats
+    const wr = winRate !== null ? `${winRate}%` : '--'
+    const pnlVal = equityFinal >= 0 ? `+${equityFinal.toFixed(2)}%` : `${equityFinal.toFixed(2)}%`
+    const pnlColor = equityFinal >= 0 ? '#30D158' : '#FF453A'
+    const avgRRVal = avgRR !== null ? `1:${avgRR}` : '--'
+    const pfVal = profitFactor !== null ? profitFactor.toFixed(2) : '--'
+
+    const stats = [
+      { label: 'Win Rate', value: wr, color: '#FFFFFF' },
+      { label: 'Total P&L', value: pnlVal, color: pnlColor },
+      { label: 'Avg R:R', value: avgRRVal, color: '#FFFFFF' },
+      { label: 'Profit Factor', value: pfVal, color: profitFactor >= 1.5 ? '#30D158' : profitFactor >= 1 ? '#FFD60A' : '#FF453A' },
+      { label: 'Total Trades', value: String(closedTrades.length), color: '#FFFFFF' },
+      { label: 'Best Streak', value: maxConsecWins > 0 ? `${maxConsecWins}W` : '--', color: '#30D158' },
+    ]
+
+    const colW = (W - 56) / 3
+    const rowH = 100
+    stats.forEach((s, i) => {
+      const col = i % 3; const row = Math.floor(i / 3)
+      const x = 28 + col * colW; const y = 108 + row * rowH
+      // Card bg
+      ctx.fillStyle = '#1E1E22'
+      ctx.roundRect(x, y, colW - 10, rowH - 10, 12)
+      ctx.fill()
+      // Label
+      ctx.font = '11px -apple-system, Inter, sans-serif'
+      ctx.fillStyle = '#8E8E93'
+      ctx.fillText(s.label, x + 12, y + 22)
+      // Value
+      ctx.font = 'bold 24px -apple-system, Inter, sans-serif'
+      ctx.fillStyle = s.color
+      ctx.fillText(s.value, x + 12, y + 54)
+    })
+
+    // Footer
+    const now2 = new Date()
+    ctx.font = '11px -apple-system, Inter, sans-serif'
+    ctx.fillStyle = '#48484A'
+    ctx.fillText(`Generated ${now2.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`, 28, H - 14)
+    ctx.fillText('tradelog-ivory.vercel.app', W - 28 - 160, H - 14)
+
+    canvas.toBlob(blob => {
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url; a.download = `tradelog_${periodLbl.replace(/\s/g,'_')}.png`
+      a.click(); URL.revokeObjectURL(url)
+    })
+  }
+
   function exportCSV() {
     const rows = [
       ['Date','Day','Time','Exit Time','Pair','Direction','Entry','SL','TP','SL Pips','Pot RR','Risk%','Outcome','P&L%','Rating','Notes','Trade Type','Mood','Rule Violated'],
@@ -1566,6 +1652,23 @@ export default function Dashboard() {
           </svg>
           Export CSV
         </button>
+        <button
+          onClick={shareStatsCard}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '6px',
+            padding: '7px 16px', borderRadius: '20px', fontSize: '13px', fontWeight: 600,
+            cursor: 'pointer', border: '1px solid var(--border)',
+            background: 'var(--bg)', color: 'var(--text-muted)', transition: 'all 0.15s', flexShrink: 0,
+          }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = '#007AFF'; e.currentTarget.style.color = '#007AFF' }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-muted)' }}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+          </svg>
+          Share
+        </button>
       </div>
 
       {/* Month / Year navigation row */}
@@ -1953,6 +2056,90 @@ export default function Dashboard() {
       {/* ── Overview Tab ── */}
       {dashTab === 'overview' && <>
 
+      {/* ── Prop Firm Monitor ── */}
+      {propEnabled && (() => {
+        const todayStr = new Date().toISOString().split('T')[0]
+        // Daily loss: today's live closed trades
+        const todayClosedLive = allLiveTrades.filter(t =>
+          t.date === todayStr && ['TP','Partial TP','SL','BE'].includes(t.outcome)
+        )
+        const todayPnL = todayClosedLive.reduce((s, t) => s + computePnL(t), 0)
+        const dailyLossAbs = Math.max(0, -todayPnL)
+        const dailyUsedPct = propDailyLimit > 0 ? (dailyLossAbs / propDailyLimit) * 100 : 0
+
+        // Total loss: all-time cumulative live closed P&L
+        const allTimeLiveClosed = allLiveTrades.filter(t =>
+          ['TP','Partial TP','SL','BE'].includes(t.outcome)
+        )
+        const allTimePnL = allTimeLiveClosed.reduce((s, t) => s + computePnL(t), 0)
+        const totalLossAbs = Math.max(0, -allTimePnL)
+        const totalUsedPct = propTotalLimit > 0 ? (totalLossAbs / propTotalLimit) * 100 : 0
+
+        function barColor(pct) {
+          if (pct >= 100) return '#FF453A'
+          if (pct >= 80) return '#FF9F0A'
+          if (pct >= 50) return '#FFD60A'
+          return '#30D158'
+        }
+
+        function statusLabel(pct, lossAbs, limit) {
+          const remaining = limit - lossAbs
+          if (pct >= 100) return { text: '🚨 Limit exceeded!', color: '#FF453A' }
+          if (pct >= 80) return { text: `⚠️ ${remaining.toFixed(2)}% remaining`, color: '#FF9F0A' }
+          if (pct >= 50) return { text: `${remaining.toFixed(2)}% remaining`, color: '#FFD60A' }
+          return { text: `${remaining.toFixed(2)}% safe buffer`, color: '#30D158' }
+        }
+
+        const dailyStatus = statusLabel(dailyUsedPct, dailyLossAbs, propDailyLimit)
+        const totalStatus = statusLabel(totalUsedPct, totalLossAbs, propTotalLimit)
+
+        return (
+          <div style={{ ...cardStyle, padding: '20px 24px', marginBottom: '14px', border: `1px solid ${dailyUsedPct >= 80 || totalUsedPct >= 80 ? 'rgba(255,69,58,0.3)' : 'var(--border)'}` }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '16px' }}>🏦</span>
+                <h2 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' }}>Prop Firm Monitor</h2>
+              </div>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Today: {todayStr}</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '16px' }}>
+              {/* Daily Loss */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)' }}>Daily Loss</span>
+                  <span style={{ fontSize: '12px', fontWeight: 700, color: barColor(dailyUsedPct) }}>
+                    -{dailyLossAbs.toFixed(2)}% / -{propDailyLimit}%
+                  </span>
+                </div>
+                <div style={{ height: '8px', borderRadius: '4px', background: 'var(--bg-secondary)', overflow: 'hidden', marginBottom: '6px' }}>
+                  <div style={{ height: '100%', width: `${Math.min(100, dailyUsedPct)}%`, background: barColor(dailyUsedPct), borderRadius: '4px', transition: 'width 0.5s ease' }} />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '11px', color: dailyStatus.color, fontWeight: 500 }}>{dailyStatus.text}</span>
+                  <span style={{ fontSize: '11px', color: 'var(--text-subtle)' }}>{Math.min(100, dailyUsedPct).toFixed(0)}% used</span>
+                </div>
+              </div>
+              {/* Total Drawdown */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)' }}>Total Drawdown</span>
+                  <span style={{ fontSize: '12px', fontWeight: 700, color: barColor(totalUsedPct) }}>
+                    -{totalLossAbs.toFixed(2)}% / -{propTotalLimit}%
+                  </span>
+                </div>
+                <div style={{ height: '8px', borderRadius: '4px', background: 'var(--bg-secondary)', overflow: 'hidden', marginBottom: '6px' }}>
+                  <div style={{ height: '100%', width: `${Math.min(100, totalUsedPct)}%`, background: barColor(totalUsedPct), borderRadius: '4px', transition: 'width 0.5s ease' }} />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '11px', color: totalStatus.color, fontWeight: 500 }}>{totalStatus.text}</span>
+                  <span style={{ fontSize: '11px', color: 'var(--text-subtle)' }}>{Math.min(100, totalUsedPct).toFixed(0)}% used</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Portfolio Value Card */}
       {accountSize > 0 && (() => {
         const periodPnlPct = equityFinal
@@ -2034,6 +2221,59 @@ export default function Dashboard() {
         ))}
       </div>
 
+      {/* Open Trade Timers */}
+      {openTrades.length > 0 && (() => {
+        function elapsed(tr) {
+          if (!tr.date) return null
+          const dt = new Date(tr.date + 'T' + (tr.time || '00:00'))
+          const ms = nowMs - dt.getTime()
+          if (ms < 0) return null
+          const h = Math.floor(ms / 3600000)
+          const m = Math.floor((ms % 3600000) / 60000)
+          const s = Math.floor((ms % 60000) / 1000)
+          if (h > 0) return `${h}h ${m}m`
+          if (m > 0) return `${m}m ${s}s`
+          return `${s}s`
+        }
+        return (
+          <div style={{ ...cardStyle, padding: '16px 20px', marginBottom: '14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#30D158', display: 'inline-block', boxShadow: '0 0 0 3px rgba(48,209,88,0.2)', animation: 'pulse 2s infinite' }} />
+              <h2 style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text)' }}>Open Trades — Live</h2>
+            </div>
+            <style>{`@keyframes pulse { 0%,100%{box-shadow:0 0 0 3px rgba(48,209,88,0.2)} 50%{box-shadow:0 0 0 6px rgba(48,209,88,0.05)} }`}</style>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {openTrades.map(tr => {
+                const el = elapsed(tr)
+                const longC = '#30D158'; const shortC = '#FF453A'
+                const dirColor = tr.direction === 'Long' ? longC : shortC
+                return (
+                  <div key={tr.id} style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-secondary)',
+                    border: '1px solid var(--border)', flexWrap: 'wrap', gap: '8px',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text)', fontFamily: 'monospace' }}>{tr.pair}</span>
+                      <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '6px', background: tr.direction === 'Long' ? 'rgba(48,209,88,0.12)' : 'rgba(255,69,58,0.12)', color: dirColor }}>{tr.direction}</span>
+                      {tr.entry && <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>@ {tr.entry}</span>}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      {tr.time && <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Entry {tr.time}</span>}
+                      {el && (
+                        <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent)', fontVariantNumeric: 'tabular-nums', minWidth: '60px', textAlign: 'right' }}>
+                          ⏱ {el}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Monthly Goals */}
       {goalItems.length > 0 && (() => {
         const monthName = now.toLocaleString('en-US', { month: 'long' })
@@ -2092,6 +2332,81 @@ export default function Dashboard() {
                   </div>
                 )
               })}
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Goal History */}
+      {goalItems.length > 0 && (() => {
+        // Build monthly stats for the last 12 months from allLiveTrades
+        const monthHistory = []
+        for (let i = 11; i >= 0; i--) {
+          const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+          const prefix = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+          const monthTrs = allLiveTrades.filter(t =>
+            t.date?.startsWith(prefix) && ['TP','Partial TP','SL','BE'].includes(t.outcome)
+          )
+          if (monthTrs.length === 0) continue
+          const pnl = parseFloat(monthTrs.reduce((s, t) => s + computePnL(t), 0).toFixed(2))
+          const tp = monthTrs.filter(t => t.outcome === 'TP' || t.outcome === 'Partial TP').length
+          const wr = Math.round(tp / monthTrs.length * 100)
+          const rrTrades = monthTrs.filter(t => (t.rr_potential || t.pot_rr))
+          const ar = rrTrades.length ? parseFloat((rrTrades.reduce((s, t) => s + (Number(t.pot_rr || t.rr_potential) || 0), 0) / rrTrades.length).toFixed(2)) : null
+          // Goal achievement
+          const goals = [
+            { key: 'pnl', label: 'P&L', target: goalMonthlyPnl, actual: pnl, achieved: goalMonthlyPnl != null && pnl >= goalMonthlyPnl },
+            { key: 'wr', label: 'Win Rate', target: goalWinRate, actual: wr, achieved: goalWinRate != null && wr >= goalWinRate },
+            { key: 'rr', label: 'Avg R:R', target: goalAvgRR, actual: ar, achieved: goalAvgRR != null && ar != null && ar >= goalAvgRR },
+            { key: 'tc', label: 'Trades', target: goalTradesCount, actual: monthTrs.length, achieved: goalTradesCount != null && monthTrs.length >= goalTradesCount },
+          ].filter(g => g.target != null)
+          monthHistory.push({ prefix, label: d.toLocaleString('en-US', { month: 'short', year: '2-digit' }), pnl, wr, ar, trades: monthTrs.length, goals })
+        }
+        if (monthHistory.length === 0) return null
+        const activeGoalKeys = goalItems.map(g => g.key)
+        return (
+          <div style={{ ...cardStyle, padding: '20px 24px', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+              <h2 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' }}>Goal History</h2>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Last {monthHistory.length} months</span>
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                    <th style={{ textAlign: 'left', padding: '6px 10px', color: 'var(--text-muted)', fontWeight: 600, fontSize: '11px' }}>Month</th>
+                    <th style={{ textAlign: 'right', padding: '6px 10px', color: 'var(--text-muted)', fontWeight: 600, fontSize: '11px' }}>P&L</th>
+                    <th style={{ textAlign: 'right', padding: '6px 10px', color: 'var(--text-muted)', fontWeight: 600, fontSize: '11px' }}>Win %</th>
+                    <th style={{ textAlign: 'right', padding: '6px 10px', color: 'var(--text-muted)', fontWeight: 600, fontSize: '11px' }}>Avg R:R</th>
+                    <th style={{ textAlign: 'right', padding: '6px 10px', color: 'var(--text-muted)', fontWeight: 600, fontSize: '11px' }}>Trades</th>
+                    <th style={{ textAlign: 'center', padding: '6px 10px', color: 'var(--text-muted)', fontWeight: 600, fontSize: '11px' }}>Goals</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {monthHistory.map((m, idx) => {
+                    const isCurrentMonth = idx === monthHistory.length - 1
+                    const achieved = m.goals.filter(g => g.achieved).length
+                    const total = m.goals.length
+                    const allDone = achieved === total
+                    return (
+                      <tr key={m.prefix} style={{ borderBottom: '1px solid var(--border)', background: isCurrentMonth ? 'var(--accent-light)' : 'transparent' }}>
+                        <td style={{ padding: '8px 10px', fontWeight: isCurrentMonth ? 700 : 500, color: isCurrentMonth ? 'var(--accent)' : 'var(--text)' }}>{m.label}{isCurrentMonth ? ' ←' : ''}</td>
+                        <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 600, color: m.pnl >= 0 ? '#30D158' : '#FF453A' }}>{m.pnl >= 0 ? '+' : ''}{m.pnl.toFixed(2)}%</td>
+                        <td style={{ padding: '8px 10px', textAlign: 'right', color: 'var(--text)' }}>{m.wr}%</td>
+                        <td style={{ padding: '8px 10px', textAlign: 'right', color: 'var(--text)' }}>{m.ar != null ? `1:${m.ar}` : '--'}</td>
+                        <td style={{ padding: '8px 10px', textAlign: 'right', color: 'var(--text-muted)' }}>{m.trades}</td>
+                        <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                          {total === 0 ? <span style={{ color: 'var(--text-subtle)' }}>--</span> : (
+                            <span style={{ fontSize: '13px', fontWeight: 700, color: allDone ? '#30D158' : achieved > 0 ? '#FF9F0A' : '#FF453A' }}>
+                              {allDone ? '✓' : `${achieved}/${total}`}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
         )
@@ -3206,6 +3521,126 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* Yearly P&L Heat Calendar */}
+      {(() => {
+        const year = new Date().getFullYear()
+        // Build day → P&L map from all live closed trades
+        const dayPnL = {}
+        allLiveTrades.forEach(tr => {
+          if (!['TP','Partial TP','SL','BE'].includes(tr.outcome)) return
+          if (!tr.date?.startsWith(String(year))) return
+          dayPnL[tr.date] = (dayPnL[tr.date] || 0) + computePnL(tr)
+        })
+        const pnlValues = Object.values(dayPnL)
+        if (pnlValues.length === 0) return null
+        const maxAbs = Math.max(...pnlValues.map(Math.abs), 0.01)
+
+        function cellColor(pnl) {
+          if (pnl === undefined) return 'transparent'
+          if (pnl === 0) return 'var(--bg-secondary)'
+          const intensity = Math.min(1, Math.abs(pnl) / maxAbs)
+          if (pnl > 0) {
+            const g = Math.round(48 + intensity * 160)
+            return `rgba(0,${g},80,${0.15 + intensity * 0.75})`
+          } else {
+            const r = Math.round(180 + intensity * 75)
+            return `rgba(${r},40,40,${0.15 + intensity * 0.75})`
+          }
+        }
+
+        // Build weeks: each column = one week (Mon-Sun), each row = day of week
+        const jan1 = new Date(year, 0, 1)
+        const dayOfWeek0 = jan1.getDay() // 0=Sun
+        const startOffset = (dayOfWeek0 === 0 ? 6 : dayOfWeek0 - 1) // make Mon=0
+        const today = new Date()
+        const todayStr = today.toISOString().split('T')[0]
+        const isLeap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0
+        const daysInYear = isLeap ? 366 : 365
+        const totalCells = startOffset + daysInYear
+        const numWeeks = Math.ceil(totalCells / 7)
+
+        const DAY_LABELS = ['M','T','W','T','F','S','S']
+        const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+        // Month label positions (which week column each month starts in)
+        const monthCols = []
+        for (let m = 0; m < 12; m++) {
+          const d = new Date(year, m, 1)
+          const dayIdx = Math.floor((d - jan1) / 86400000)
+          const weekIdx = Math.floor((dayIdx + startOffset) / 7)
+          monthCols.push({ month: MONTHS[m], col: weekIdx })
+        }
+
+        const cellSize = isMobile ? 10 : 13
+        const gap = 2
+
+        return (
+          <div style={{ ...cardStyle, padding: '20px 24px', marginBottom: '14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+              <h2 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' }}>{year} P&L Calendar</h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--text-muted)' }}>
+                <span>Less</span>
+                {[-1,-0.5,0,0.5,1].map(v => (
+                  <div key={v} style={{ width: 10, height: 10, borderRadius: 2, background: v === 0 ? 'var(--bg-secondary)' : v > 0 ? `rgba(0,${Math.round(48+v*160)},80,${0.15+v*0.75})` : `rgba(${Math.round(180+Math.abs(v)*75)},40,40,${0.15+Math.abs(v)*0.75})` }} />
+                ))}
+                <span>More</span>
+              </div>
+            </div>
+            <div style={{ overflowX: 'auto', paddingBottom: '4px' }}>
+              {/* Month labels row */}
+              <div style={{ display: 'flex', marginLeft: isMobile ? 14 : 18, marginBottom: '4px', position: 'relative', height: '14px', minWidth: numWeeks * (cellSize + gap) }}>
+                {monthCols.map(({ month, col }, i) => (
+                  <div key={i} style={{
+                    position: 'absolute', left: col * (cellSize + gap),
+                    fontSize: '10px', color: 'var(--text-muted)', fontWeight: 500, whiteSpace: 'nowrap',
+                  }}>{month}</div>
+                ))}
+              </div>
+              {/* Grid: day-of-week rows × week columns */}
+              <div style={{ display: 'flex', gap: gap }}>
+                {/* Day labels */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: gap, marginRight: 2 }}>
+                  {DAY_LABELS.map((d, i) => (
+                    <div key={i} style={{ height: cellSize, fontSize: '9px', color: 'var(--text-subtle)', display: 'flex', alignItems: 'center', width: isMobile ? 10 : 14 }}>{i % 2 === 0 ? d : ''}</div>
+                  ))}
+                </div>
+                {/* Week columns */}
+                {Array.from({ length: numWeeks }, (_, wk) => (
+                  <div key={wk} style={{ display: 'flex', flexDirection: 'column', gap }}>
+                    {Array.from({ length: 7 }, (_, dow) => {
+                      const cellIdx = wk * 7 + dow
+                      const dayIdx = cellIdx - startOffset
+                      if (dayIdx < 0 || dayIdx >= daysInYear) {
+                        return <div key={dow} style={{ width: cellSize, height: cellSize }} />
+                      }
+                      const d = new Date(year, 0, dayIdx + 1)
+                      const ds = d.toISOString().split('T')[0]
+                      const pnl = dayPnL[ds]
+                      const isFuture = ds > todayStr
+                      const isToday = ds === todayStr
+                      const title = pnl !== undefined
+                        ? `${ds}: ${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}%`
+                        : ds
+                      return (
+                        <div key={dow} title={title} style={{
+                          width: cellSize, height: cellSize, borderRadius: 2,
+                          background: isFuture ? 'transparent' : cellColor(pnl),
+                          border: isToday ? '1px solid var(--accent)' : pnl === undefined && !isFuture ? '1px solid var(--border)' : 'none',
+                          cursor: pnl !== undefined ? 'default' : 'default',
+                          opacity: isFuture ? 0 : 1,
+                        }} />
+                      )
+                    })}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <p style={{ fontSize: '11px', color: 'var(--text-subtle)', marginTop: '10px' }}>
+              {Object.keys(dayPnL).length} trading days · hover a cell to see the date &amp; P&L
+            </p>
+          </div>
+        )
+      })()}
 
       {/* Recent trades */}
       <div style={cardStyle}>

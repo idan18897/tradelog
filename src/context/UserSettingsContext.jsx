@@ -37,6 +37,9 @@ export function UserSettingsProvider({ children }) {
   const [goalAvgRR, setGoalAvgRR] = useState(null)
   const [continuationEnabled, setContinuationEnabled] = useState(false)
   const [continuationWindowDays, setContinuationWindowDays] = useState(1)
+  const [propEnabled, setPropEnabled] = useState(false)
+  const [propDailyLimit, setPropDailyLimit] = useState(5)
+  const [propTotalLimit, setPropTotalLimit] = useState(10)
 
   useEffect(() => {
     applyColors(DEFAULT_LONG, DEFAULT_SHORT)
@@ -75,6 +78,18 @@ export function UserSettingsProvider({ children }) {
         if (data.goal_trades_count != null) setGoalTradesCount(data.goal_trades_count)
         if (data.goal_avg_rr != null) setGoalAvgRR(data.goal_avg_rr)
       })
+    // Prop Firm settings — separate query so missing columns never crash main settings
+    supabase
+      .from('user_settings')
+      .select('prop_enabled, prop_daily_loss_limit, prop_total_loss_limit')
+      .eq('user_id', user.id)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error || !data) return
+        if (data.prop_enabled != null) setPropEnabled(data.prop_enabled)
+        if (data.prop_daily_loss_limit != null) setPropDailyLimit(data.prop_daily_loss_limit)
+        if (data.prop_total_loss_limit != null) setPropTotalLimit(data.prop_total_loss_limit)
+      })
     // Continuation settings — separate query so missing columns never crash main settings
     supabase
       .from('user_settings')
@@ -95,7 +110,7 @@ export function UserSettingsProvider({ children }) {
   }
 
   return (
-    <UserSettingsContext.Provider value={{ longColor, shortColor, updateColors, plan, accountSize, setAccountSize, showDollarValues, setShowDollarValues, dailyReminder, setDailyReminder, reminderTime, setReminderTime, goalMonthlyPnl, setGoalMonthlyPnl, goalWinRate, setGoalWinRate, goalTradesCount, setGoalTradesCount, goalAvgRR, setGoalAvgRR, continuationEnabled, setContinuationEnabled, continuationWindowDays, setContinuationWindowDays }}>
+    <UserSettingsContext.Provider value={{ longColor, shortColor, updateColors, plan, accountSize, setAccountSize, showDollarValues, setShowDollarValues, dailyReminder, setDailyReminder, reminderTime, setReminderTime, goalMonthlyPnl, setGoalMonthlyPnl, goalWinRate, setGoalWinRate, goalTradesCount, setGoalTradesCount, goalAvgRR, setGoalAvgRR, continuationEnabled, setContinuationEnabled, continuationWindowDays, setContinuationWindowDays, propEnabled, setPropEnabled, propDailyLimit, setPropDailyLimit, propTotalLimit, setPropTotalLimit }}>
       {children}
     </UserSettingsContext.Provider>
   )
