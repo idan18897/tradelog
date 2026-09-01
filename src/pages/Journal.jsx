@@ -463,14 +463,14 @@ function TradeCalendar({ trades, secondaryTrades, calMonth, onMonthChange, filte
                         )}
                       </div>
                     )}
-                    {!hasTrades && hasMissed && missed.potPnL !== 0 && (
-                      <div style={{ marginTop: '8px', fontSize: '13px', fontWeight: 700, color: missed.potPnL >= 0 ? '#FF9F0A' : '#FF453A' }}>
-                        {missed.potPnL >= 0 ? '+' : ''}{missed.potPnL.toFixed(2)}%
+                    {!hasTrades && hasMissed && (
+                      <div style={{ marginTop: '8px', fontSize: '13px', fontWeight: 700, color: missed.potPnL > 0 ? '#FF9F0A' : missed.potPnL < 0 ? '#FF453A' : 'var(--text-muted)' }}>
+                        {missed.potPnL > 0 ? '+' : ''}{missed.potPnL.toFixed(2)}%
                       </div>
                     )}
-                    {hasTrades && hasMissed && missed.potPnL !== 0 && (
-                      <div style={{ fontSize: '11px', fontWeight: 600, color: missed.potPnL >= 0 ? '#FF9F0A' : '#FF453A', marginTop: '2px' }}>
-                        {missed.potPnL >= 0 ? '+' : ''}{missed.potPnL.toFixed(2)}%
+                    {hasTrades && hasMissed && (
+                      <div style={{ fontSize: '11px', fontWeight: 600, color: missed.potPnL > 0 ? '#FF9F0A' : missed.potPnL < 0 ? '#FF453A' : 'var(--text-muted)', marginTop: '2px' }}>
+                        {missed.potPnL > 0 ? '+' : ''}{missed.potPnL.toFixed(2)}%
                       </div>
                     )}
                   </div>
