@@ -27,6 +27,8 @@ export function computePnL(trade) {
 export function computeMissedPotGain(trade) {
   // If the missed trade resulted in SL, it represents a potential loss avoided
   if (trade.outcome === 'SL') return -(Number(trade.risk_pct) || 0.5)
+  // BE, Invalid, Open = no gain/loss
+  if (trade.outcome === 'BE' || trade.outcome === 'Invalid' || trade.outcome === 'Open' || !trade.outcome) return 0
   const fullRR = Number(trade.rr_potential) || Number(trade.pot_rr) || 0
   const risk = Number(trade.risk_pct) || 0.5
   if (!fullRR) return 0
