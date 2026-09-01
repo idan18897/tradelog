@@ -463,14 +463,14 @@ function TradeCalendar({ trades, secondaryTrades, calMonth, onMonthChange, filte
                         )}
                       </div>
                     )}
-                    {!hasTrades && hasMissed && missed.potPnL > 0 && (
-                      <div style={{ marginTop: '8px', fontSize: '13px', fontWeight: 700, color: '#FF9F0A' }}>
-                        +{missed.potPnL.toFixed(2)}%
+                    {!hasTrades && hasMissed && missed.potPnL !== 0 && (
+                      <div style={{ marginTop: '8px', fontSize: '13px', fontWeight: 700, color: missed.potPnL >= 0 ? '#FF9F0A' : '#FF453A' }}>
+                        {missed.potPnL >= 0 ? '+' : ''}{missed.potPnL.toFixed(2)}%
                       </div>
                     )}
-                    {hasTrades && hasMissed && missed.potPnL > 0 && (
-                      <div style={{ fontSize: '11px', fontWeight: 600, color: '#FF9F0A', marginTop: '2px' }}>
-                        +{missed.potPnL.toFixed(2)}%
+                    {hasTrades && hasMissed && missed.potPnL !== 0 && (
+                      <div style={{ fontSize: '11px', fontWeight: 600, color: missed.potPnL >= 0 ? '#FF9F0A' : '#FF453A', marginTop: '2px' }}>
+                        {missed.potPnL >= 0 ? '+' : ''}{missed.potPnL.toFixed(2)}%
                       </div>
                     )}
                   </div>
@@ -481,11 +481,11 @@ function TradeCalendar({ trades, secondaryTrades, calMonth, onMonthChange, filte
               <div style={{
                 minHeight: '72px',
                 borderRadius: '8px',
-                border: (weekHasTrades || weekMissedPnL > 0)
-                  ? `1px solid ${weekHasTrades ? (weekPnL >= 0 ? 'rgba(48,209,88,0.35)' : 'rgba(255,69,58,0.35)') : 'rgba(255,159,10,0.35)'}`
+                border: (weekHasTrades || weekMissedPnL !== 0)
+                  ? `1px solid ${weekHasTrades ? (weekPnL >= 0 ? 'rgba(48,209,88,0.35)' : 'rgba(255,69,58,0.35)') : (weekMissedPnL >= 0 ? 'rgba(255,159,10,0.35)' : 'rgba(255,69,58,0.35)')}`
                   : '1px solid transparent',
-                background: (weekHasTrades || weekMissedPnL > 0)
-                  ? weekHasTrades ? (weekPnL >= 0 ? 'rgba(48,209,88,0.18)' : 'rgba(255,69,58,0.18)') : 'rgba(255,159,10,0.12)'
+                background: (weekHasTrades || weekMissedPnL !== 0)
+                  ? weekHasTrades ? (weekPnL >= 0 ? 'rgba(48,209,88,0.18)' : 'rgba(255,69,58,0.18)') : (weekMissedPnL >= 0 ? 'rgba(255,159,10,0.12)' : 'rgba(255,69,58,0.12)')
                   : 'transparent',
                 display: 'flex',
                 flexDirection: 'column',
@@ -494,7 +494,7 @@ function TradeCalendar({ trades, secondaryTrades, calMonth, onMonthChange, filte
                 gap: '4px',
                 padding: '6px 4px',
               }}>
-                {(weekHasTrades || weekMissedPnL > 0) && (
+                {(weekHasTrades || weekMissedPnL !== 0) && (
                   <>
                     <span style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Weekly</span>
                     {weekHasTrades && (
@@ -509,9 +509,9 @@ function TradeCalendar({ trades, secondaryTrades, calMonth, onMonthChange, filte
                         )}
                       </>
                     )}
-                    {weekMissedPnL > 0 && (
-                      <span style={{ fontSize: '11px', fontWeight: 700, color: '#FF9F0A', textAlign: 'center' }}>
-                        +{weekMissedPnL.toFixed(2)}%
+                    {weekMissedPnL !== 0 && (
+                      <span style={{ fontSize: '11px', fontWeight: 700, color: weekMissedPnL >= 0 ? '#FF9F0A' : '#FF453A', textAlign: 'center' }}>
+                        {weekMissedPnL >= 0 ? '+' : ''}{weekMissedPnL.toFixed(2)}%
                       </span>
                     )}
                   </>
@@ -1159,7 +1159,7 @@ function JournalInner() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div>
                 <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>Potential P&L</p>
-                <p style={{ fontSize: '20px', fontWeight: 700, color: '#FF9F0A' }}>+{missedTotalPotPnL.toFixed(1)}%</p>
+                <p style={{ fontSize: '20px', fontWeight: 700, color: missedTotalPotPnL >= 0 ? '#FF9F0A' : '#FF453A' }}>{missedTotalPotPnL >= 0 ? '+' : ''}{missedTotalPotPnL.toFixed(1)}%</p>
               </div>
               <div>
                 <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>Avg R:R</p>
